@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-// ALTERAÇÃO: Usamos um import absoluto para garantir que o caminho está sempre correto.
-import 'package:hellofarmer_app/features/presentation/screens/auth_gate.dart';
+// ALTERAÇÃO: Corrigimos o caminho de importação para o AuthGate.
+import 'package:hellofarmer_app/features/auth/presentation/screens/auth_gate.dart';
 import 'package:hellofarmer_app/presentation/theme/app_theme.dart';
 
 Future<void> main() async {
@@ -20,7 +20,7 @@ class HelloFarmerApp extends StatelessWidget {
     return MaterialApp(
       title: 'HelloFarmer',
       theme: AppTheme.lightTheme,
-      // A nossa home continua a ser o AuthGate, que agora será encontrado corretamente.
+      // Agora que o import está correto, o AuthGate será encontrado.
       home: const AuthGate(),
       debugShowCheckedModeBanner: false,
     );

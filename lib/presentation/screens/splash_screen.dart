@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-// ALTERAÇÃO: Usamos um import absoluto aqui também.
-import 'package:hellofarmer_app/features/presentation/screens/auth_gate.dart';
+import 'package:hellofarmer_app/features/auth/presentation/screens/auth_gate.dart';
 import 'package:hellofarmer_app/presentation/theme/app_theme.dart';
 
 

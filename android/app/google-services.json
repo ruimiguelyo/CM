@@ -12,7 +12,12 @@
           "package_name": "com.example.hellofarmer_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "487385761751-ul5k838mgnjc64jbpjod0vb45a3m7cvu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAl8EAIiR5D-z5bHw4hzdF8GDE60d_zHqk"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "487385761751-ul5k838mgnjc64jbpjod0vb45a3m7cvu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
