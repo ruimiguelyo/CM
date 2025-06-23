@@ -14,7 +14,12 @@ import 'package:flutter/foundation.dart'
 /// ```
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
+    // ADICIONAMOS UMA LINHA DE DEBUG AQUI
+    print('A verificar a plataforma. É web? $kIsWeb');
+
     if (kIsWeb) {
+      // E OUTRA AQUI PARA CONFIRMAR
+      print('A entrar no bloco de configuração para a Web.');
       // Estes são os valores corretos para a vossa plataforma Web,
       // copiados da vossa consola do Firebase.
       return const FirebaseOptions(
