@@ -3,6 +3,7 @@ import 'package:hellofarmer_app/models/product_model.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
 import 'package:hellofarmer_app/providers/cart_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:hellofarmer_app/screens/product_detail_screen.dart';
 
 class AllProductsScreen extends StatefulWidget {
   const AllProductsScreen({super.key});
@@ -74,57 +75,66 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                   itemCount: products.length,
                   itemBuilder: (context, index) {
                     final product = products[index];
-                    return Card(
-                      clipBehavior: Clip.antiAlias,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Center(
-                              child: product.imagemUrl.isNotEmpty
-                                  ? Image.network(
-                                      product.imagemUrl,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                    )
-                                  : Container(
-                                      color: Colors.grey[200],
-                                      child: Icon(Icons.image_not_supported, size: 50, color: Colors.grey[500]),
-                                    ),
-                            ),
+                    return InkWell(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => ProductDetailScreen(product: product),
                           ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  product.nome,
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text('€${product.preco.toStringAsFixed(2)} / ${product.unidade}'),
-                              ],
+                        );
+                      },
+                      child: Card(
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Center(
+                                child: product.imagemUrl.isNotEmpty
+                                    ? Image.network(
+                                        product.imagemUrl,
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                      )
+                                    : Container(
+                                        color: Colors.grey[200],
+                                        child: Icon(Icons.image_not_supported, size: 50, color: Colors.grey[500]),
+                                      ),
+                              ),
                             ),
-                          ),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: IconButton(
-                              icon: Icon(Icons.add_shopping_cart, color: Theme.of(context).primaryColor),
-                              onPressed: () {
-                                final cart = context.read<CartProvider>();
-                                cart.addItem(product);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('${product.nome} foi adicionado ao carrinho.'),
-                                    duration: const Duration(seconds: 2),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    product.nome,
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                );
-                              },
+                                  Text('€${product.preco.toStringAsFixed(2)} / ${product.unidade}'),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: IconButton(
+                                icon: Icon(Icons.add_shopping_cart, color: Theme.of(context).primaryColor),
+                                onPressed: () {
+                                  final cart = context.read<CartProvider>();
+                                  cart.addItem(product);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('${product.nome} foi adicionado ao carrinho.'),
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },

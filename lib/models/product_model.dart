@@ -21,23 +21,8 @@ class ProductModel {
     required this.dataCriacao,
   });
 
-  // Converte um DocumentSnapshot para um objeto ProductModel
-  factory ProductModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    return ProductModel(
-      id: doc.id,
-      nome: data['nome'] ?? '',
-      descricao: data['descricao'] ?? '',
-      preco: (data['preco'] ?? 0.0).toDouble(),
-      unidade: data['unidade'] ?? 'Unidade',
-      imagemUrl: data['imagemUrl'] ?? '',
-      produtorId: data['produtorId'] ?? '',
-      dataCriacao: data['dataCriacao'] ?? Timestamp.now(),
-    );
-  }
-
-  // Converte um objeto ProductModel para um Map para o Firestore
-  Map<String, dynamic> toFirestore() {
+  // Converte o objeto ProductModel para um Map.
+  Map<String, dynamic> toMap() {
     return {
       'nome': nome,
       'descricao': descricao,
@@ -47,5 +32,30 @@ class ProductModel {
       'produtorId': produtorId,
       'dataCriacao': dataCriacao,
     };
+  }
+
+  // Mantido para compatibilidade com o código existente que usa toFirestore.
+  // O ideal seria refatorar todo o código para usar toMap.
+  Map<String, dynamic> toFirestore() => toMap();
+
+  // Cria um objeto ProductModel a partir de um Documento do Firestore.
+  factory ProductModel.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data()! as Map<String, dynamic>;
+    data['id'] = doc.id; // Adiciona o ID do documento ao mapa
+    return ProductModel.fromMap(data);
+  }
+
+  // Cria um objeto ProductModel a partir de um Map.
+  factory ProductModel.fromMap(Map<String, dynamic> map) {
+    return ProductModel(
+      id: map['id'],
+      nome: map['nome'] ?? '',
+      descricao: map['descricao'] ?? '',
+      preco: (map['preco'] ?? 0.0).toDouble(),
+      unidade: map['unidade'] ?? '',
+      imagemUrl: map['imagemUrl'] ?? '',
+      produtorId: map['produtorId'] ?? '',
+      dataCriacao: map['dataCriacao'] ?? Timestamp.now(),
+    );
   }
 } 

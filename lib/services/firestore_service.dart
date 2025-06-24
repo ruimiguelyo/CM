@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hellofarmer_app/models/product_model.dart';
 import 'package:hellofarmer_app/models/user_model.dart';
+import 'package:hellofarmer_app/models/order_model.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -87,5 +88,29 @@ class FirestoreService {
         .collection('products')
         .doc(produtoId)
         .delete();
+  }
+
+  // --- MÉTODOS PARA GESTÃO DE ENCOMENDAS ---
+
+  // Coloca uma nova encomenda
+  Future<void> placeOrder(OrderModel order) async {
+    final userRef = _db.collection('users').doc(order.userId);
+    final orderRef = _db.collection('orders').doc(); // Cria um novo ID de encomenda
+
+    // Usamos um write batch para garantir que ambas as operações são bem sucedidas ou ambas falham.
+    WriteBatch batch = _db.batch();
+
+    // 1. Adiciona a encomenda à coleção principal de encomendas
+    batch.set(orderRef, order.toMap());
+
+    // 2. Adiciona uma referência da encomenda ao utilizador que a fez
+    batch.set(userRef.collection('user_orders').doc(orderRef.id), {
+      'orderId': orderRef.id,
+      'orderDate': order.orderDate,
+      'total': order.total,
+    });
+    
+    // Executa as operações em batch
+    await batch.commit();
   }
 } 

@@ -1,28 +1,36 @@
 import 'package:hellofarmer_app/models/product_model.dart';
 
 class CartItemModel {
-  final String id; // Será o id do produto
-  final String nome;
-  final double preco;
-  final String imagemUrl;
-  int quantidade;
+  final ProductModel product;
+  final int quantity;
 
-  CartItemModel({
-    required this.id,
-    required this.nome,
-    required this.preco,
-    required this.imagemUrl,
-    required this.quantidade,
+  const CartItemModel({
+    required this.product,
+    this.quantity = 1,
   });
 
-  // Construtor para criar um item de carrinho a partir de um produto
-  factory CartItemModel.fromProduct(ProductModel product) {
+  CartItemModel copyWith({
+    int? quantity,
+  }) {
     return CartItemModel(
-      id: product.id!,
-      nome: product.nome,
-      preco: product.preco,
-      imagemUrl: product.imagemUrl,
-      quantidade: 1, // Começa sempre com quantidade 1
+      product: product,
+      quantity: quantity ?? this.quantity,
+    );
+  }
+
+  // Converte o objeto CartItemModel para um Map
+  Map<String, dynamic> toMap() {
+    return {
+      'product': product.toMap(),
+      'quantity': quantity,
+    };
+  }
+
+  // Cria um CartItemModel a partir de um Map
+  factory CartItemModel.fromMap(Map<String, dynamic> map) {
+    return CartItemModel(
+      product: ProductModel.fromMap(map['product']),
+      quantity: map['quantity'],
     );
   }
 } 
