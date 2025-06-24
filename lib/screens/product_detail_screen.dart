@@ -5,6 +5,7 @@ import 'package:hellofarmer_app/services/firestore_service.dart';
 import 'package:hellofarmer_app/screens/producer_detail_screen.dart';
 import 'package:hellofarmer_app/providers/cart_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProductDetailScreen extends StatelessWidget {
   final ProductModel product;
@@ -14,6 +15,7 @@ class ProductDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final FirestoreService firestoreService = FirestoreService();
+    final authUser = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       appBar: AppBar(
@@ -101,34 +103,46 @@ class ProductDetailScreen extends StatelessWidget {
           ],
         ),
       ),
-      // Botão de Adicionar ao Carrinho
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ElevatedButton.icon(
-          icon: const Icon(Icons.add_shopping_cart),
-          label: const Text('Adicionar ao Carrinho'),
-          onPressed: () {
-            final cart = context.read<CartProvider>();
-            cart.addItem(product);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${product.nome} foi adicionado ao carrinho.'),
-                duration: const Duration(seconds: 2),
-                action: SnackBarAction(
-                  label: 'VER',
-                  onPressed: () {
-                    // Navegar para o ecrã do carrinho se necessário
-                  },
-                ),
-              ),
-            );
-          },
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ),
+      // Botão de Adicionar ao Carrinho (condicional)
+      bottomNavigationBar: authUser == null
+          ? null
+          : StreamBuilder<UserModel>(
+              stream: firestoreService.getUser(authUser.uid),
+              builder: (context, snapshot) {
+                if (snapshot.hasData && snapshot.data!.tipo == 'consumidor') {
+                  return Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.add_shopping_cart),
+                      label: const Text('Adicionar ao Carrinho'),
+                      onPressed: () {
+                        final cart = context.read<CartProvider>();
+                        cart.addItem(product);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${product.nome} foi adicionado ao carrinho.'),
+                            duration: const Duration(seconds: 2),
+                            action: SnackBarAction(
+                              label: 'VER',
+                              onPressed: () {
+                                // Navegar para o ecrã do carrinho se necessário
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        textStyle: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  );
+                }
+                // Retorna null ou um widget vazio para não mostrar nada
+                return const SizedBox.shrink();
+              },
+            ),
     );
   }
 } 

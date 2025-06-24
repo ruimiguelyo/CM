@@ -3,7 +3,7 @@ import 'package:hellofarmer_app/models/cart_item_model.dart';
 import 'package:hellofarmer_app/models/product_model.dart';
 
 class CartProvider with ChangeNotifier {
-  final Map<String, CartItemModel> _items = {};
+  Map<String, CartItemModel> _items = {};
 
   Map<String, CartItemModel> get items => {..._items};
 
@@ -12,51 +12,37 @@ class CartProvider with ChangeNotifier {
   double get totalAmount {
     var total = 0.0;
     _items.forEach((key, cartItem) {
-      total += cartItem.preco * cartItem.quantidade;
+      total += cartItem.product.preco * cartItem.quantity;
     });
     return total;
   }
 
   void addItem(ProductModel product) {
     if (_items.containsKey(product.id)) {
-      // Apenas incrementa a quantidade
       _items.update(
         product.id!,
-        (existingItem) => CartItemModel(
-          id: existingItem.id,
-          nome: existingItem.nome,
-          preco: existingItem.preco,
-          imagemUrl: existingItem.imagemUrl,
-          quantidade: existingItem.quantidade + 1,
+        (existingCartItem) => existingCartItem.copyWith(
+          quantity: existingCartItem.quantity + 1,
         ),
       );
     } else {
-      // Adiciona um novo item
       _items.putIfAbsent(
         product.id!,
-        () => CartItemModel.fromProduct(product),
+        () => CartItemModel(product: product, quantity: 1),
       );
     }
-    notifyListeners(); // Notifica os widgets que estão a ouvir
-  }
-
-  void removeItem(String productId) {
-    _items.remove(productId);
     notifyListeners();
   }
 
   void removeSingleItem(String productId) {
-    if (!_items.containsKey(productId)) return;
-
-    if (_items[productId]!.quantidade > 1) {
+    if (!_items.containsKey(productId)) {
+      return;
+    }
+    if (_items[productId]!.quantity > 1) {
       _items.update(
         productId,
-        (existingItem) => CartItemModel(
-          id: existingItem.id,
-          nome: existingItem.nome,
-          preco: existingItem.preco,
-          imagemUrl: existingItem.imagemUrl,
-          quantidade: existingItem.quantidade - 1,
+        (existingCartItem) => existingCartItem.copyWith(
+          quantity: existingCartItem.quantity - 1,
         ),
       );
     } else {
@@ -65,7 +51,12 @@ class CartProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void clearCart() {
+  void removeItem(String productId) {
+    _items.remove(productId);
+    notifyListeners();
+  }
+
+  void clear() {
     _items.clear();
     notifyListeners();
   }

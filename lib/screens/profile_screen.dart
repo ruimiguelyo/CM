@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:hellofarmer_app/models/user_model.dart';
 import 'package:hellofarmer_app/screens/product_management_screen.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
+import 'package:hellofarmer_app/services/auth_repository.dart';
+import 'package:provider/provider.dart';
+import 'package:hellofarmer_app/screens/orders_screen.dart';
+import 'package:hellofarmer_app/screens/producer_orders_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -45,6 +49,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 24),
               if (user.tipo == 'agricultor')
                 _buildProductManagementCard(user),
+              // Opção para ver as encomendas (apenas para consumidores)
+              if (user.tipo == 'consumidor')
+                ListTile(
+                  leading: const Icon(Icons.receipt_long),
+                  title: const Text('Minhas Encomendas'),
+                  onTap: () {
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (context) => const OrdersScreen(),
+                    ));
+                  },
+                ),
+              const Divider(),
             ],
           );
         },
@@ -111,31 +127,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildProductManagementCard(UserModel user) {
     return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Os Meus Produtos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 8),
-            const Text('Adicione, edite ou remova os produtos disponíveis para venda na sua quinta.'),
-            const SizedBox(height: 16),
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => ProductManagementScreen(userId: user.uid),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.store),
-                label: const Text('Gerir Produtos'),
-              ),
-            )
-          ],
-        ),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        children: [
+          const ListTile(
+            leading: Icon(Icons.business_center),
+            title: Text('Área do Produtor'),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          ListTile(
+            leading: const Icon(Icons.inventory_2_outlined),
+            title: const Text('Gerir Produtos'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => ProductManagementScreen(userId: user.uid),
+              ));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.receipt_outlined),
+            title: const Text('Encomendas Recebidas'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+               Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => const ProducerOrdersScreen(),
+              ));
+            },
+          ),
+        ],
       ),
     );
   }

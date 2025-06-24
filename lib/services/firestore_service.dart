@@ -113,4 +113,32 @@ class FirestoreService {
     // Executa as operações em batch
     await batch.commit();
   }
+
+  // Obtém um stream com todas as encomendas de um utilizador específico
+  Stream<List<OrderModel>> getUserOrders(String userId) {
+    return _db
+        .collection('orders')
+        .where('userId', isEqualTo: userId)
+        // .orderBy('orderDate', descending: true) // Removido para evitar erro de índice
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => OrderModel.fromFirestore(doc))
+            .toList());
+  }
+
+  // NOVO: Obtém um stream com todas as encomendas para um produtor específico
+  Stream<List<OrderModel>> getProducerOrders(String producerId) {
+    return _db
+        .collection('orders')
+        .where('producerIds', arrayContains: producerId)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => OrderModel.fromFirestore(doc))
+            .toList());
+  }
+
+  // NOVO: Atualiza o estado de uma encomenda
+  Future<void> updateOrderStatus(String orderId, String newStatus) {
+    return _db.collection('orders').doc(orderId).update({'status': newStatus});
+  }
 } 

@@ -4,6 +4,8 @@ import 'package:hellofarmer_app/services/firestore_service.dart';
 import 'package:hellofarmer_app/providers/cart_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:hellofarmer_app/screens/product_detail_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hellofarmer_app/models/user_model.dart';
 
 class AllProductsScreen extends StatefulWidget {
   const AllProductsScreen({super.key});
@@ -18,6 +20,8 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authUser = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Todos os Produtos'),
@@ -117,21 +121,30 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                                 ],
                               ),
                             ),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: IconButton(
-                                icon: Icon(Icons.add_shopping_cart, color: Theme.of(context).primaryColor),
-                                onPressed: () {
-                                  final cart = context.read<CartProvider>();
-                                  cart.addItem(product);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('${product.nome} foi adicionado ao carrinho.'),
-                                      duration: const Duration(seconds: 2),
+                            // Apenas mostra o botão se for consumidor
+                            StreamBuilder<UserModel>(
+                              stream: _firestoreService.getUser(authUser!.uid),
+                              builder: (context, userSnapshot) {
+                                if (userSnapshot.hasData && userSnapshot.data!.tipo == 'consumidor') {
+                                  return Align(
+                                    alignment: Alignment.centerRight,
+                                    child: IconButton(
+                                      icon: Icon(Icons.add_shopping_cart, color: Theme.of(context).primaryColor),
+                                      onPressed: () {
+                                        final cart = context.read<CartProvider>();
+                                        cart.addItem(product);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('${product.nome} foi adicionado ao carrinho.'),
+                                            duration: const Duration(seconds: 2),
+                                          ),
+                                        );
+                                      },
                                     ),
                                   );
-                                },
-                              ),
+                                }
+                                return const SizedBox.shrink(); // Retorna um widget vazio se não for consumidor
+                              }
                             ),
                           ],
                         ),

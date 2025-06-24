@@ -8,6 +8,8 @@ class OrderModel {
   final double total;
   final Timestamp orderDate;
   final String status;
+  final Map<String, String> shippingAddress;
+  final List<String> producerIds;
 
   OrderModel({
     this.id,
@@ -15,6 +17,8 @@ class OrderModel {
     required this.items,
     required this.total,
     required this.orderDate,
+    required this.shippingAddress,
+    required this.producerIds,
     this.status = 'Pendente',
   });
 
@@ -27,6 +31,8 @@ class OrderModel {
       'total': total,
       'orderDate': orderDate,
       'status': status,
+      'shippingAddress': shippingAddress,
+      'producerIds': producerIds,
     };
   }
 
@@ -44,6 +50,8 @@ class OrderModel {
       total: data['total'],
       orderDate: data['orderDate'],
       status: data['status'],
+      shippingAddress: Map<String, String>.from(data['shippingAddress'] ?? {}),
+      producerIds: List<String>.from(data['producerIds'] ?? []),
     );
   }
 } 
