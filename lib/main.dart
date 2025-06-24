@@ -2,8 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:hellofarmer_app/firebase_options.dart';
 // Imports refatorados para a nova arquitetura
-import 'package:hellofarmer_app/screens/auth_gate.dart';
+import 'package:hellofarmer_app/screens/splash_screen.dart';
+import 'package:hellofarmer_app/services/notification_service.dart';
 import 'package:hellofarmer_app/theme/app_theme.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:hellofarmer_app/providers/cart_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
+
+// Esta função tem de estar fora de uma classe (top-level)
+// para poder ser chamada quando a app está em segundo plano.
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Se quiser fazer algo com a mensagem em segundo plano, como guardar dados,
+  // pode fazer aqui. Por agora, apenas imprimimos para depuração.
+  print("A lidar com uma mensagem em segundo plano: ${message.messageId}");
+}
 
 Future<void> main() async {
   // Garantimos que os bindings do Flutter estão inicializados antes de chamar o Firebase.
@@ -12,6 +26,15 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Define o handler de mensagens em segundo plano, APENAS se não for web,
+  // pois esta função não é suportada nessa plataforma e causa um crash.
+  if (!kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    // O serviço de notificações também só deve ser inicializado em mobile.
+    await NotificationService().initNotifications();
+  }
+
   runApp(const HelloFarmerApp());
 }
 
@@ -20,12 +43,15 @@ class HelloFarmerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'HelloFarmer',
-      theme: AppTheme.lightTheme,
-      // Agora que o import está correto, o AuthGate será encontrado.
-      home: const AuthGate(),
-      debugShowCheckedModeBanner: false,
+    return ChangeNotifierProvider(
+      create: (context) => CartProvider(),
+      child: MaterialApp(
+        title: 'HelloFarmer',
+        theme: AppTheme.lightTheme,
+        // Usamos o SplashScreen como ecrã inicial
+        home: const SplashScreen(),
+        debugShowCheckedModeBanner: false,
+      ),
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 // Esta classe representa o modelo de dados para um utilizador na nossa aplicação.
 class UserModel {
   final String uid; // O ID único do Firebase Auth.
@@ -9,6 +11,7 @@ class UserModel {
   final String codigoPostal;
   // O tipo de utilizador, agora determinado pela lógica do NIF.
   final String tipo; 
+  final String? fcmToken;
 
   // Tornamos o construtor principal privado para forçar a utilização do factory.
   // Desta forma, garantimos que a lógica de verificação do NIF é sempre aplicada.
@@ -21,6 +24,7 @@ class UserModel {
     required this.morada,
     required this.codigoPostal,
     required this.tipo,
+    this.fcmToken,
   });
 
   // Usamos um factory constructor para adicionar lógica antes da criação do objeto.
@@ -32,6 +36,7 @@ class UserModel {
     required String telefone,
     required String morada,
     required String codigoPostal,
+    String? fcmToken,
   }) {
     // Aplicamos a lógica para determinar o tipo de utilizador com base no NIF.
     String tipoUtilizador = 'consumidor'; // Assumimos 'consumidor' por defeito.
@@ -55,6 +60,24 @@ class UserModel {
       morada: morada,
       codigoPostal: codigoPostal,
       tipo: tipoUtilizador,
+      fcmToken: fcmToken,
+    );
+  }
+
+  // NOVO: Factory para criar um UserModel a partir de um documento do Firestore.
+  // Isto é essencial para ler os dados da base de dados.
+  factory UserModel.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    return UserModel._(
+      uid: doc.id,
+      nome: data['nome'] ?? '',
+      email: data['email'] ?? '',
+      nif: data['nif'] ?? '',
+      telefone: data['telefone'] ?? '',
+      morada: data['morada'] ?? '',
+      codigoPostal: data['codigoPostal'] ?? '',
+      tipo: data['tipo'] ?? 'consumidor',
+      fcmToken: data['fcmToken'],
     );
   }
 
@@ -70,6 +93,7 @@ class UserModel {
       'morada': morada,
       'codigoPostal': codigoPostal,
       'tipo': tipo,
+      'fcmToken': fcmToken,
     };
   }
 }
