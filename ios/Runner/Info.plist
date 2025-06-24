@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Esta aplicação precisa de acesso à galeria para que possa selecionar uma imagem para os seus produtos.</string>
 </dict>
 </plist>

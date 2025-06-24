@@ -7,6 +7,7 @@ import 'package:hellofarmer_app/screens/producer_detail_screen.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
 import 'package:hellofarmer_app/providers/cart_provider.dart';
 import 'package:hellofarmer_app/screens/cart_screen.dart';
+import 'package:hellofarmer_app/screens/all_products_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:hellofarmer_app/widgets/custom_badge.dart';
 
@@ -108,6 +109,15 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => const AllProductsScreen()),
+          );
+        },
+        label: const Text('Ver Produtos'),
+        icon: const Icon(Icons.shopping_basket_outlined),
       ),
     );
   }

@@ -17,6 +17,17 @@ class FirestoreService {
             .toList());
   }
 
+  // NOVO: Obtém um stream com todos os produtos de todos os agricultores.
+  Stream<List<ProductModel>> getAllProducts() {
+    return _db
+        .collectionGroup('products')
+        // .orderBy('dataCriacao', descending: true) // Removido para evitar erro de índice
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => ProductModel.fromFirestore(doc))
+            .toList());
+  }
+
   // Obtém os dados de um utilizador específico em tempo real.
   Stream<UserModel> getUser(String uid) {
     return _db

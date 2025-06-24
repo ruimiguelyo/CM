@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hellofarmer_app/models/product_model.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class AddEditProductScreen extends StatefulWidget {
   final String userId;
@@ -25,6 +29,10 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   String _unidadeSelecionada = 'Kg';
   final List<String> _unidades = ['Kg', 'Unidade', 'L', 'Molho', 'Dúzia'];
 
+  XFile? _pickedImage;
+  String? _imagemUrlExistente;
+  final _picker = ImagePicker();
+
   @override
   void initState() {
     super.initState();
@@ -33,6 +41,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     _descricaoController = TextEditingController(text: widget.product?.descricao ?? '');
     _precoController = TextEditingController(text: widget.product?.preco.toString() ?? '');
     _unidadeSelecionada = widget.product?.unidade ?? 'Kg';
+    _imagemUrlExistente = widget.product?.imagemUrl;
   }
 
   @override
@@ -43,14 +52,47 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 50, maxWidth: 800);
+    if (pickedFile != null) {
+      setState(() {
+        _pickedImage = pickedFile;
+      });
+    }
+  }
+
+  Future<String> _uploadImage(XFile image) async {
+    final storageRef = FirebaseStorage.instance
+        .ref()
+        .child('product_images')
+        .child('${widget.userId}_${DateTime.now().toIso8601String()}.jpg');
+
+    final uploadTask = storageRef.putData(await image.readAsBytes(), SettableMetadata(contentType: 'image/jpeg'));
+    final snapshot = await uploadTask.whenComplete(() => {});
+    final downloadUrl = await snapshot.ref.getDownloadURL();
+    return downloadUrl;
+  }
+
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    if (_pickedImage == null && (_imagemUrlExistente == null || _imagemUrlExistente!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, selecione uma imagem para o produto.'), backgroundColor: Colors.red),
+      );
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
+      String imageUrl = _imagemUrlExistente ?? '';
+
+      if (_pickedImage != null) {
+        imageUrl = await _uploadImage(_pickedImage!);
+      }
+
       final product = ProductModel(
         id: widget.product?.id,
         nome: _nomeController.text,
@@ -58,7 +100,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         preco: double.parse(_precoController.text.replaceAll(',', '.')),
         unidade: _unidadeSelecionada,
         produtorId: widget.userId,
-        imagemUrl: '', // TODO: Implementar upload de imagem
+        imagemUrl: imageUrl,
         dataCriacao: widget.product?.dataCriacao ?? Timestamp.now(),
       );
 
@@ -99,6 +141,29 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Widget para escolher e pré-visualizar a imagem
+              Container(
+                height: 200,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: _pickedImage != null
+                    ? (kIsWeb
+                        ? Image.network(_pickedImage!.path, fit: BoxFit.cover)
+                        : Image.file(File(_pickedImage!.path), fit: BoxFit.cover))
+                    : (_imagemUrlExistente != null && _imagemUrlExistente!.isNotEmpty)
+                        ? Image.network(_imagemUrlExistente!, fit: BoxFit.cover)
+                        : const Center(child: Text('Nenhuma imagem selecionada.')),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                icon: const Icon(Icons.image),
+                label: const Text('Selecionar Imagem'),
+                onPressed: _pickImage,
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _nomeController,
                 decoration: const InputDecoration(labelText: 'Nome do Produto'),
