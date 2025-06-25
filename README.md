@@ -101,110 +101,6 @@ intl: ^0.20.2
 - Android Studio / VS Code
 - Conta Firebase configurada
 
-### Passos de Instalação
-
-1. **Clone o repositório**
-```bash
-git clone https://github.com/seu-usuario/hellofarmer.git
-cd hellofarmer
-```
-
-2. **Instale as dependências**
-```bash
-flutter pub get
-```
-
-3. **Configure o Firebase**
-- Crie um projeto no [Firebase Console](https://console.firebase.google.com/)
-- Adicione as configurações Android/iOS
-- Baixe e adicione os ficheiros de configuração:
-  - `android/app/google-services.json`
-  - `ios/Runner/GoogleService-Info.plist`
-
-4. **Configure as permissões**
-
-**Android** (`android/app/src/main/AndroidManifest.xml`):
-```xml
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-<uses-permission android:name="android.permission.CAMERA" />
-```
-
-**iOS** (`ios/Runner/Info.plist`):
-```xml
-<key>NSLocationWhenInUseUsageDescription</key>
-<string>Esta app precisa de acesso à localização para mostrar produtores próximos.</string>
-<key>NSCameraUsageDescription</key>
-<string>Esta app precisa de acesso à câmara para digitalizar códigos QR.</string>
-```
-
-5. **Execute a aplicação**
-```bash
-flutter run
-```
-
-## 🔥 Firebase Setup
-
-### Firestore Collections
-```
-users/
-├── {userId}/
-    ├── nome: string
-    ├── email: string
-    ├── tipo: string ('consumidor' | 'produtor')
-    ├── morada: string
-    ├── telefone: string
-    ├── favoritos: array<string>
-    └── products/ (subcollection para produtores)
-        └── {productId}/
-            ├── nome: string
-            ├── descricao: string
-            ├── preco: number
-            ├── categoria: string
-            ├── stock: number
-            ├── imageUrl: string
-            └── createdAt: timestamp
-
-orders/
-├── {orderId}/
-    ├── userId: string
-    ├── producerIds: array<string>
-    ├── items: array<object>
-    ├── total: number
-    ├── status: string
-    ├── moradaEntrega: string
-    ├── orderRating: number (optional)
-    ├── producerRating: number (optional)
-    ├── reviewText: string (optional)
-    └── createdAt: timestamp
-```
-
-### Security Rules
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Users can read/write their own data
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-      // Products subcollection
-      match /products/{productId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && request.auth.uid == userId;
-      }
-    }
-    
-    // Orders can be read by involved users
-    match /orders/{orderId} {
-      allow read, write: if request.auth != null && 
-        (request.auth.uid == resource.data.userId || 
-         request.auth.uid in resource.data.producerIds);
-    }
-  }
-}
-```
 
 ## 🗺️ Configuração do Google Maps
 
@@ -217,10 +113,6 @@ A Google Maps API está **totalmente configurada e ativa** com as seguintes APIs
 - ✅ **Geolocation API** - Para obter localização do utilizador  
 - ✅ **Maps 3D SDK for Android** - Para mapas nativos Android
 
-### Configuração Atual
-- **Chave API**: `AIzaSyBGIobQGPzElfA1DIRA3KbEc-bpMTD4f7U`
-- **Configuração Web**: Configurada em `web/index.html`
-- **Configuração Android**: Pronta para configurar em `android/app/src/main/AndroidManifest.xml`
 
 ### Funcionalidades Disponíveis
 - 🗺️ **Mapas interativos** na home screen (vista de produtores)
@@ -386,7 +278,7 @@ lib/
 - **Regras de Segurança Firestore** - Controlo de acesso granular
 - **Validação de Dados** - Sanitização de inputs
 - **Permissões de Sistema** - Solicitação adequada de permissões
-- **Transações Atómicas** - Consistência de dados garantida
+- **Transações** 
 
 ## 🌟 Funcionalidades Futuras
 
@@ -397,41 +289,15 @@ lib/
 - [ ] **Entrega Programada** - Agendamento de entregas
 - [ ] **Programa de Fidelidade** - Sistema de pontos e recompensas
 - [ ] **Analytics Avançado** - Dashboard de métricas detalhadas
-- [ ] **Modo Offline** - Funcionalidades básicas sem internet
 - [ ] **Suporte Multi-idioma** - Internacionalização
 
-## 🤝 Contribuição
 
-### Como Contribuir
-1. Faça um fork do projeto
-2. Crie uma branch para a sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit as suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
+## 👨‍💻 Autores
 
-### Guidelines
-- Siga as convenções de código Dart/Flutter
-- Escreva testes para novas funcionalidades
-- Documente mudanças no CHANGELOG.md
-- Use commits semânticos
+**Rui Miguel Sá**
+**Francisco Candeias**
+**Tomás Carapinha**
 
-## 📄 Licença
-
-Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
-
-## 👨‍💻 Autor
-
-**Rui Miguel**
-- Email: ruimiguelsa.stb@gmail.com
-- LinkedIn: [Rui Miguel](https://linkedin.com/in/ruimiguel)
-- GitHub: [@ruimiguel](https://github.com/ruimiguel)
-
-## 🙏 Agradecimentos
-
-- **Flutter Team** - Pelo excelente framework
-- **Firebase Team** - Pela plataforma robusta
-- **Comunidade Open Source** - Pelas bibliotecas utilizadas
-- **Professores e Colegas** - Pelo apoio e feedback
 
 ---
 
