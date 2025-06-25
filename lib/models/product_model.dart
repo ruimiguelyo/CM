@@ -9,6 +9,8 @@ class ProductModel {
   final String imagemUrl;
   final String produtorId;
   final Timestamp dataCriacao;
+  final double stock;
+  final String categoria; // NOVO: Categoria do produto (frutas, legumes, etc.)
 
   ProductModel({
     this.id,
@@ -19,6 +21,8 @@ class ProductModel {
     required this.imagemUrl,
     required this.produtorId,
     required this.dataCriacao,
+    required this.stock,
+    this.categoria = 'Outros', // NOVO: Categoria padrão
   });
 
   // Converte o objeto ProductModel para um Map.
@@ -31,6 +35,8 @@ class ProductModel {
       'imagemUrl': imagemUrl,
       'produtorId': produtorId,
       'dataCriacao': dataCriacao,
+      'stock': stock,
+      'categoria': categoria, // NOVO
     };
   }
 
@@ -56,6 +62,8 @@ class ProductModel {
       imagemUrl: map['imagemUrl'] ?? '',
       produtorId: map['produtorId'] ?? '',
       dataCriacao: map['dataCriacao'] ?? Timestamp.now(),
+      stock: (map['stock'] ?? 0.0).toDouble(),
+      categoria: map['categoria'] ?? 'Outros', // NOVO
     );
   }
 } 

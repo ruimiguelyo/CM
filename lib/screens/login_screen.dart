@@ -154,6 +154,50 @@ class _LoginScreenState extends State<LoginScreen> {
                       : const Text('Iniciar Sessão'),
                 ),
                 const SizedBox(height: 24),
+
+                // Botões de login rápido para teste
+                Text('Acesso Rápido (Desenvolvimento)', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade600)),
+                const SizedBox(height: 12),
+                
+                // Consumidores
+                Text('Consumidores:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade700)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildQuickLoginButton('Rita Sousa', 'rita.sousa@email.pt', Colors.blue),
+                    _buildQuickLoginButton('Tiago Mendes', 'tiago.mendes@email.pt', Colors.blue),
+                    _buildQuickLoginButton('Carla Nunes', 'carla.nunes@email.pt', Colors.blue),
+                    _buildQuickLoginButton('Bruno Dias', 'bruno.dias@email.pt', Colors.blue),
+                    _buildQuickLoginButton('Patrícia Lima', 'patricia.lima@email.pt', Colors.blue),
+                  ],
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Produtores
+                Text('Produtores:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade700)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildQuickLoginButton('João Silva', 'joao.silva@farm.pt', Colors.green),
+                    _buildQuickLoginButton('Maria Santos', 'maria.santos@verde.pt', Colors.green),
+                    _buildQuickLoginButton('António Costa', 'antonio.costa@bio.pt', Colors.green),
+                    _buildQuickLoginButton('Ana Ferreira', 'ana.ferreira@natural.pt', Colors.green),
+                    _buildQuickLoginButton('Carlos Oliveira', 'carlos.oliveira@campo.pt', Colors.green),
+                    _buildQuickLoginButton('Isabel Rodrigues', 'isabel.rodrigues@terra.pt', Colors.green),
+                    _buildQuickLoginButton('Pedro Almeida', 'pedro.almeida@fresco.pt', Colors.green),
+                    _buildQuickLoginButton('Luísa Martins', 'luisa.martins@organico.pt', Colors.green),
+                    _buildQuickLoginButton('Miguel Pereira', 'miguel.pereira@sustentavel.pt', Colors.green),
+                    _buildQuickLoginButton('Sofia Gomes', 'sofia.gomes@tradicional.pt', Colors.green),
+                  ],
+                ),
+                
+                const SizedBox(height: 24),
+                
                 const Row(
                   children: <Widget>[
                     Expanded(child: Divider()),
@@ -200,6 +244,12 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _loginFast(String email) {
+    _emailController.text = email;
+    _passwordController.text = 'password123';
+    _loginUser();
+  }
+
   Widget _buildSocialButton(IconData icon, VoidCallback onPressed) {
     return IconButton(
       icon: FaIcon(icon, color: AppTheme.primaryColor),
@@ -212,6 +262,14 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         padding: const EdgeInsets.all(16)
       ),
+    );
+  }
+
+  Widget _buildQuickLoginButton(String name, String email, Color color) {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(backgroundColor: color),
+      onPressed: _isLoading ? null : () => _loginFast(email),
+      child: Text(name, style: const TextStyle(fontSize: 12)),
     );
   }
 }

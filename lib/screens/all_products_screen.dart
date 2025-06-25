@@ -118,6 +118,13 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   Text('€${product.preco.toStringAsFixed(2)} / ${product.unidade}'),
+                                  Text(
+                                    product.stock > 0 ? 'Stock: ${product.stock.toStringAsFixed(0)}' : 'Esgotado',
+                                    style: TextStyle(
+                                      color: product.stock > 0 ? Colors.green : Colors.red,
+                                      fontWeight: FontWeight.bold
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -129,17 +136,30 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                                   return Align(
                                     alignment: Alignment.centerRight,
                                     child: IconButton(
-                                      icon: Icon(Icons.add_shopping_cart, color: Theme.of(context).primaryColor),
-                                      onPressed: () {
-                                        final cart = context.read<CartProvider>();
-                                        cart.addItem(product);
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('${product.nome} foi adicionado ao carrinho.'),
-                                            duration: const Duration(seconds: 2),
-                                          ),
-                                        );
-                                      },
+                                      icon: Icon(
+                                        product.stock > 0 ? Icons.add_shopping_cart : Icons.remove_shopping_cart_outlined,
+                                        color: product.stock > 0 ? Theme.of(context).primaryColor : Colors.grey,
+                                      ),
+                                      onPressed: product.stock > 0 ? () {
+                                        try {
+                                          final cart = context.read<CartProvider>();
+                                          cart.addItem(product);
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('${product.nome} foi adicionado ao carrinho.'),
+                                              duration: const Duration(seconds: 2),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Erro ao adicionar ao carrinho: $e'),
+                                              backgroundColor: Colors.red,
+                                              duration: const Duration(seconds: 2),
+                                            ),
+                                          );
+                                        }
+                                      } : null,
                                     ),
                                   );
                                 }

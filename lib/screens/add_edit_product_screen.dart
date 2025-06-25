@@ -25,6 +25,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   late TextEditingController _nomeController;
   late TextEditingController _descricaoController;
   late TextEditingController _precoController;
+  late TextEditingController _stockController;
 
   String _unidadeSelecionada = 'Kg';
   final List<String> _unidades = ['Kg', 'Unidade', 'L', 'Molho', 'Dúzia'];
@@ -40,6 +41,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     _nomeController = TextEditingController(text: widget.product?.nome ?? '');
     _descricaoController = TextEditingController(text: widget.product?.descricao ?? '');
     _precoController = TextEditingController(text: widget.product?.preco.toString() ?? '');
+    _stockController = TextEditingController(text: widget.product?.stock.toString() ?? '');
     _unidadeSelecionada = widget.product?.unidade ?? 'Kg';
     _imagemUrlExistente = widget.product?.imagemUrl;
   }
@@ -49,6 +51,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     _nomeController.dispose();
     _descricaoController.dispose();
     _precoController.dispose();
+    _stockController.dispose();
     super.dispose();
   }
 
@@ -102,6 +105,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         produtorId: widget.userId,
         imagemUrl: imageUrl,
         dataCriacao: widget.product?.dataCriacao ?? Timestamp.now(),
+        stock: double.parse(_stockController.text.replaceAll(',', '.')),
       );
 
       if (widget.product == null) {
@@ -209,6 +213,17 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _stockController,
+                decoration: const InputDecoration(labelText: 'Stock Disponível', prefixIcon: Icon(Icons.inventory_2_outlined)),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) {
+                  if (value!.isEmpty) return 'Obrigatório';
+                  if (double.tryParse(value.replaceAll(',', '.')) == null) return 'Número inválido';
+                  return null;
+                },
               ),
               const SizedBox(height: 32),
               ElevatedButton.icon(

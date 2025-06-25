@@ -26,25 +26,60 @@ class ProductDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Imagem do Produto
-            SizedBox(
-              height: 300,
-              width: double.infinity,
-              child: product.imagemUrl.isNotEmpty
-                  ? Image.network(
-                      product.imagemUrl,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return const Center(child: CircularProgressIndicator());
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(Icons.broken_image, size: 100, color: Colors.grey);
-                      },
-                    )
-                  : Container(
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.image_not_supported, size: 100, color: Colors.grey),
-                    ),
+            Stack(
+              children: [
+                SizedBox(
+                  height: 300,
+                  width: double.infinity,
+                  child: product.imagemUrl.isNotEmpty
+                      ? Image.network(
+                          product.imagemUrl,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const Center(child: CircularProgressIndicator());
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(Icons.broken_image, size: 100, color: Colors.grey);
+                          },
+                        )
+                      : Container(
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.image_not_supported, size: 100, color: Colors.grey),
+                        ),
+                ),
+                // Ícone de Favorito
+                if(authUser != null)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: StreamBuilder<UserModel>(
+                    stream: firestoreService.getUser(authUser.uid),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const SizedBox.shrink();
+                      final user = snapshot.data!;
+                      final isFavorite = user.favoritos.contains(product.id);
+
+                      return CircleAvatar(
+                        backgroundColor: Colors.black54,
+                        child: IconButton(
+                          icon: Icon(
+                            isFavorite ? Icons.favorite : Icons.favorite_border,
+                            color: isFavorite ? Colors.red : Colors.white,
+                          ),
+                          onPressed: () {
+                            if (isFavorite) {
+                              firestoreService.removerProdutoDosFavoritos(user.uid, product.id!);
+                            } else {
+                              firestoreService.addProdutoAosFavoritos(user.uid, product.id!);
+                            }
+                          },
+                        ),
+                      );
+                    }
+                  ),
+                ),
+              ],
             ),
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -66,10 +101,13 @@ class ProductDetailScreen extends StatelessWidget {
                         ),
                   ),
                   const SizedBox(height: 16),
-                  // Descrição
+                  // Stock
                   Text(
-                    product.descricao,
-                    style: Theme.of(context).textTheme.bodyLarge,
+                    product.stock > 0 ? 'Disponível: ${product.stock.toStringAsFixed(0)} unidades' : 'Produto Esgotado',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: product.stock > 0 ? Colors.green.shade700 : Colors.red.shade700,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   const Divider(),
@@ -113,25 +151,38 @@ class ProductDetailScreen extends StatelessWidget {
                   return Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: ElevatedButton.icon(
-                      icon: const Icon(Icons.add_shopping_cart),
-                      label: const Text('Adicionar ao Carrinho'),
-                      onPressed: () {
-                        final cart = context.read<CartProvider>();
-                        cart.addItem(product);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${product.nome} foi adicionado ao carrinho.'),
-                            duration: const Duration(seconds: 2),
-                            action: SnackBarAction(
-                              label: 'VER',
-                              onPressed: () {
-                                // Navegar para o ecrã do carrinho se necessário
-                              },
+                      icon: product.stock > 0 
+                          ? const Icon(Icons.add_shopping_cart)
+                          : const Icon(Icons.remove_shopping_cart_outlined),
+                      label: Text(product.stock > 0 ? 'Adicionar ao Carrinho' : 'Esgotado'),
+                      onPressed: product.stock > 0 ? () {
+                        try {
+                          final cart = context.read<CartProvider>();
+                          cart.addItem(product);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${product.nome} foi adicionado ao carrinho.'),
+                              duration: const Duration(seconds: 2),
+                              action: SnackBarAction(
+                                label: 'VER',
+                                onPressed: () {
+                                  // Navegar para o ecrã do carrinho se necessário
+                                },
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Erro ao adicionar ao carrinho: $e'),
+                              backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      } : null,
                       style: ElevatedButton.styleFrom(
+                        backgroundColor: product.stock > 0 ? Theme.of(context).primaryColor : Colors.grey,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         textStyle: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold),

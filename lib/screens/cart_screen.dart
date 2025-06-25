@@ -1,9 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:hellofarmer_app/models/order_model.dart';
 import 'package:hellofarmer_app/providers/cart_provider.dart';
-import 'package:hellofarmer_app/services/firestore_service.dart';
 import 'package:provider/provider.dart';
 import 'package:hellofarmer_app/screens/checkout_screen.dart';
 
@@ -15,8 +11,6 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  bool _isLoading = false;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

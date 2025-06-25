@@ -3,7 +3,7 @@ import 'package:hellofarmer_app/models/cart_item_model.dart';
 import 'package:hellofarmer_app/models/product_model.dart';
 
 class CartProvider with ChangeNotifier {
-  Map<String, CartItemModel> _items = {};
+  final Map<String, CartItemModel> _items = {};
 
   Map<String, CartItemModel> get items => {..._items};
 
@@ -18,18 +18,33 @@ class CartProvider with ChangeNotifier {
   }
 
   void addItem(ProductModel product) {
+    if (product.id == null || product.id!.isEmpty) {
+      print('Erro: Produto sem ID válido');
+      return;
+    }
+    
     if (_items.containsKey(product.id)) {
-      _items.update(
-        product.id!,
-        (existingCartItem) => existingCartItem.copyWith(
-          quantity: existingCartItem.quantity + 1,
-        ),
-      );
+      if ((_items[product.id]!.quantity + 1) <= product.stock) {
+        _items.update(
+          product.id!,
+          (existingCartItem) => existingCartItem.copyWith(
+            quantity: existingCartItem.quantity + 1,
+          ),
+        );
+      } else {
+        print('Stock máximo atingido para ${product.nome}');
+        return;
+      }
     } else {
-      _items.putIfAbsent(
-        product.id!,
-        () => CartItemModel(product: product, quantity: 1),
-      );
+      if (product.stock > 0) {
+        _items.putIfAbsent(
+          product.id!,
+          () => CartItemModel(product: product, quantity: 1),
+        );
+      } else {
+        print('Produto ${product.nome} está esgotado.');
+        return;
+      }
     }
     notifyListeners();
   }

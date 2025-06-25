@@ -33,28 +33,80 @@ class OrdersScreen extends StatelessWidget {
                 }
 
                 final orders = snapshot.data!;
+                // Separa as encomendas com base no estado
+                final activeOrders = orders.where((o) => o.status != 'Entregue').toList();
+                final deliveredOrders = orders.where((o) => o.status == 'Entregue').toList();
 
-                return ListView.builder(
-                  itemCount: orders.length,
-                  itemBuilder: (context, index) {
-                    final order = orders[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        title: Text('Encomenda #${order.id!.substring(0, 8)}'),
-                        subtitle: Text('Total: ${order.total.toStringAsFixed(2)} €'),
-                        trailing: Text(DateFormat('dd/MM/yyyy').format(order.orderDate.toDate())),
-                        onTap: () {
-                          Navigator.of(context).push(MaterialPageRoute(
-                            builder: (context) => OrderDetailScreen(order: order),
-                          ));
-                        },
-                      ),
-                    );
-                  },
+                return ListView(
+                  children: [
+                    if (activeOrders.isNotEmpty)
+                      _buildSectionTitle(context, 'A caminho!'),
+                    ...activeOrders.map((order) => _buildOrderCard(context, order)),
+                    if (deliveredOrders.isNotEmpty)
+                      _buildSectionTitle(context, 'Entregues'),
+                    ...deliveredOrders.map((order) => _buildOrderCard(context, order)),
+                  ],
                 );
               },
             ),
+    );
+  }
+
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildOrderCard(BuildContext context, OrderModel order) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (context) => OrderDetailScreen(order: order),
+        ));
+      },
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Encomenda #${order.id!.substring(0, 8)}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text(DateFormat('d MMMM y, HH:mm').format(order.orderDate.toDate())),
+              const Divider(),
+              // Lista de produtos na encomenda
+              ...order.items.map((item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: Text('${item.product.nome} (x${item.quantity})')),
+                    Text('€${(item.product.preco * item.quantity).toStringAsFixed(2)}'),
+                  ],
+                ),
+              )),
+              const Divider(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text('€${order.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 } 

@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:hellofarmer_app/models/user_model.dart';
 import 'package:hellofarmer_app/screens/product_management_screen.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
-import 'package:hellofarmer_app/services/auth_repository.dart';
-import 'package:provider/provider.dart';
 import 'package:hellofarmer_app/screens/orders_screen.dart';
 import 'package:hellofarmer_app/screens/producer_orders_screen.dart';
+import 'package:hellofarmer_app/screens/producer_reviews_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -152,6 +151,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onTap: () {
                Navigator.of(context).push(MaterialPageRoute(
                 builder: (context) => const ProducerOrdersScreen(),
+              ));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.star_border),
+            title: const Text('Minhas Avaliações'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+               Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => const ProducerReviewsScreen(),
               ));
             },
           ),

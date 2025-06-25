@@ -10,6 +10,12 @@ class OrderModel {
   final String status;
   final Map<String, String> shippingAddress;
   final List<String> producerIds;
+  final double? orderRating;
+  final double? producerRating;
+  final String? reviewText;
+  final List<String>? reviewImageUrls;
+  final String? producerReplyText;
+  final Timestamp? producerReplyDate;
 
   OrderModel({
     this.id,
@@ -20,6 +26,12 @@ class OrderModel {
     required this.shippingAddress,
     required this.producerIds,
     this.status = 'Pendente',
+    this.orderRating,
+    this.producerRating,
+    this.reviewText,
+    this.reviewImageUrls,
+    this.producerReplyText,
+    this.producerReplyDate,
   });
 
   // Converte o objeto OrderModel para um formato compatível com o Firestore.
@@ -33,6 +45,12 @@ class OrderModel {
       'status': status,
       'shippingAddress': shippingAddress,
       'producerIds': producerIds,
+      'orderRating': orderRating,
+      'producerRating': producerRating,
+      'reviewText': reviewText,
+      'reviewImageUrls': reviewImageUrls,
+      'producerReplyText': producerReplyText,
+      'producerReplyDate': producerReplyDate,
     };
   }
 
@@ -52,6 +70,12 @@ class OrderModel {
       status: data['status'],
       shippingAddress: Map<String, String>.from(data['shippingAddress'] ?? {}),
       producerIds: List<String>.from(data['producerIds'] ?? []),
+      orderRating: (data['orderRating'] as num?)?.toDouble(),
+      producerRating: (data['producerRating'] as num?)?.toDouble(),
+      reviewText: data['reviewText'],
+      reviewImageUrls: List<String>.from(data['reviewImageUrls'] ?? []),
+      producerReplyText: data['producerReplyText'],
+      producerReplyDate: data['producerReplyDate'],
     );
   }
 } 

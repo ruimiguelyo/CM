@@ -12,6 +12,9 @@ class UserModel {
   // O tipo de utilizador, agora determinado pela lógica do NIF.
   final String tipo; 
   final String? fcmToken;
+  final List<String> favoritos;
+  final double? latitude;
+  final double? longitude;
 
   // Tornamos o construtor principal privado para forçar a utilização do factory.
   // Desta forma, garantimos que a lógica de verificação do NIF é sempre aplicada.
@@ -25,6 +28,9 @@ class UserModel {
     required this.codigoPostal,
     required this.tipo,
     this.fcmToken,
+    this.favoritos = const [],
+    this.latitude,
+    this.longitude,
   });
 
   // Usamos um factory constructor para adicionar lógica antes da criação do objeto.
@@ -37,6 +43,9 @@ class UserModel {
     required String morada,
     required String codigoPostal,
     String? fcmToken,
+    List<String>? favoritos,
+    double? latitude,
+    double? longitude,
   }) {
     // Aplicamos a lógica para determinar o tipo de utilizador com base no NIF.
     String tipoUtilizador = 'consumidor'; // Assumimos 'consumidor' por defeito.
@@ -61,6 +70,9 @@ class UserModel {
       codigoPostal: codigoPostal,
       tipo: tipoUtilizador,
       fcmToken: fcmToken,
+      favoritos: favoritos ?? [],
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 
@@ -78,6 +90,9 @@ class UserModel {
       codigoPostal: data['codigoPostal'] ?? '',
       tipo: data['tipo'] ?? 'consumidor',
       fcmToken: data['fcmToken'],
+      favoritos: List<String>.from(data['favoritos'] ?? []),
+      latitude: data['latitude']?.toDouble(),
+      longitude: data['longitude']?.toDouble(),
     );
   }
 
@@ -94,6 +109,9 @@ class UserModel {
       'codigoPostal': codigoPostal,
       'tipo': tipo,
       'fcmToken': fcmToken,
+      'favoritos': favoritos,
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 }
