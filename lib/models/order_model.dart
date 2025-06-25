@@ -16,6 +16,8 @@ class OrderModel {
   final List<String>? reviewImageUrls;
   final String? producerReplyText;
   final Timestamp? producerReplyDate;
+  final double? deliveryLatitude;
+  final double? deliveryLongitude;
 
   OrderModel({
     this.id,
@@ -32,6 +34,8 @@ class OrderModel {
     this.reviewImageUrls,
     this.producerReplyText,
     this.producerReplyDate,
+    this.deliveryLatitude,
+    this.deliveryLongitude,
   });
 
   // Converte o objeto OrderModel para um formato compatível com o Firestore.
@@ -51,6 +55,8 @@ class OrderModel {
       'reviewImageUrls': reviewImageUrls,
       'producerReplyText': producerReplyText,
       'producerReplyDate': producerReplyDate,
+      'deliveryLatitude': deliveryLatitude,
+      'deliveryLongitude': deliveryLongitude,
     };
   }
 
@@ -76,6 +82,8 @@ class OrderModel {
       reviewImageUrls: List<String>.from(data['reviewImageUrls'] ?? []),
       producerReplyText: data['producerReplyText'],
       producerReplyDate: data['producerReplyDate'],
+      deliveryLatitude: (data['deliveryLatitude'] as num?)?.toDouble(),
+      deliveryLongitude: (data['deliveryLongitude'] as num?)?.toDouble(),
     );
   }
 } 

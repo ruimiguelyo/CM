@@ -3,6 +3,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:hellofarmer_app/services/location_service.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hellofarmer_app/services/firestore_service.dart';
+import 'package:hellofarmer_app/models/user_model.dart';
 
 class SensorsDemoScreen extends StatefulWidget {
   const SensorsDemoScreen({super.key});
@@ -13,8 +16,10 @@ class SensorsDemoScreen extends StatefulWidget {
 
 class _SensorsDemoScreenState extends State<SensorsDemoScreen> {
   final LocationService _locationService = LocationService();
+  final FirestoreService _firestoreService = FirestoreService();
   
   Position? _currentPosition;
+  String _locationSource = ''; // 'GPS do Dispositivo' ou 'Perfil de Produtor'
   bool _isLoadingLocation = false;
   String _locationError = '';
   
@@ -27,10 +32,10 @@ class _SensorsDemoScreenState extends State<SensorsDemoScreen> {
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();
+    _initializeLocation();
   }
 
-  Future<void> _getCurrentLocation() async {
+  Future<void> _initializeLocation() async {
     if (!mounted) return;
     
     setState(() {
@@ -38,27 +43,56 @@ class _SensorsDemoScreenState extends State<SensorsDemoScreen> {
       _locationError = '';
     });
 
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      setState(() {
+        _locationError = 'Utilizador não autenticado.';
+        _isLoadingLocation = false;
+      });
+      return;
+    }
+
     try {
-      final position = await _locationService.getCurrentLocation();
-      if (position != null && mounted) {
-        setState(() {
-          _currentPosition = position;
-        });
-        _updateMapMarker(position);
-        
-        // Move a câmara para a localização atual
-        if (_mapController != null) {
-          _mapController!.animateCamera(
-            CameraUpdate.newLatLngZoom(
-              LatLng(position.latitude, position.longitude),
-              15.0,
-            ),
-          );
+      final userModel = await _firestoreService.getUser(firebaseUser.uid).first;
+      
+      // Lógica para Produtor
+      if (userModel.tipo == 'agricultor' && userModel.latitude != null && userModel.longitude != null) {
+        final producerPosition = Position(
+          latitude: userModel.latitude!,
+          longitude: userModel.longitude!,
+          timestamp: DateTime.now(),
+          accuracy: 50.0,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          headingAccuracy: 0,
+          speed: 0,
+          speedAccuracy: 0
+        );
+
+        if (mounted) {
+          setState(() {
+            _currentPosition = producerPosition;
+            _locationSource = 'Perfil de Produtor';
+          });
+          _updateMapMarker(producerPosition, isProducer: true);
+          _moveMapCamera(producerPosition);
         }
-      } else if (mounted) {
-        setState(() {
-          _locationError = 'Não foi possível obter a localização';
-        });
+      } else {
+        // Lógica para Consumidor (ou produtor sem localização)
+        final position = await _locationService.getCurrentLocation();
+        if (position != null && mounted) {
+          setState(() {
+            _currentPosition = position;
+            _locationSource = 'GPS do Dispositivo';
+          });
+          _updateMapMarker(position);
+          _moveMapCamera(position);
+        } else if (mounted) {
+          setState(() {
+            _locationError = 'Não foi possível obter a localização do dispositivo.';
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -75,7 +109,18 @@ class _SensorsDemoScreenState extends State<SensorsDemoScreen> {
     }
   }
 
-  void _updateMapMarker(Position position) {
+  void _moveMapCamera(Position position) {
+    if (_mapController != null) {
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(position.latitude, position.longitude),
+          15.0,
+        ),
+      );
+    }
+  }
+
+  void _updateMapMarker(Position position, {bool isProducer = false}) {
     if (!mounted) return;
     
     setState(() {
@@ -83,11 +128,11 @@ class _SensorsDemoScreenState extends State<SensorsDemoScreen> {
         Marker(
           markerId: const MarkerId('current_location'),
           position: LatLng(position.latitude, position.longitude),
-          infoWindow: const InfoWindow(
-            title: 'Minha Localização',
-            snippet: 'Você está aqui',
+          infoWindow: InfoWindow(
+            title: isProducer ? 'A sua Quinta' : 'A sua Localização',
+            snippet: isProducer ? 'Localização guardada no seu perfil' : 'Localização atual do dispositivo',
           ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+          icon: BitmapDescriptor.defaultMarkerWithHue(isProducer ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueBlue),
         ),
       };
     });
@@ -96,7 +141,7 @@ class _SensorsDemoScreenState extends State<SensorsDemoScreen> {
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
     if (_currentPosition != null) {
-      _updateMapMarker(_currentPosition!);
+      _moveMapCamera(_currentPosition!);
     }
   }
 
@@ -107,8 +152,9 @@ class _SensorsDemoScreenState extends State<SensorsDemoScreen> {
         title: const Text('GPS e Localização'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.my_location),
-            onPressed: _isLoadingLocation ? null : _getCurrentLocation,
+            icon: const Icon(Icons.refresh),
+            onPressed: _isLoadingLocation ? null : _initializeLocation,
+            tooltip: 'Atualizar Localização',
           ),
         ],
       ),
@@ -132,6 +178,15 @@ class _SensorsDemoScreenState extends State<SensorsDemoScreen> {
                     ),
                   ],
                 ),
+                if (_locationSource.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Chip(
+                      label: Text(_locationSource, style: const TextStyle(color: Colors.white)),
+                      backgroundColor: _locationSource == 'Perfil de Produtor' ? Colors.green : Colors.blue,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
                 const SizedBox(height: 8),
                 if (_isLoadingLocation)
                   const Row(
@@ -173,7 +228,7 @@ class _SensorsDemoScreenState extends State<SensorsDemoScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _isLoadingLocation ? null : _getCurrentLocation,
+        onPressed: _isLoadingLocation ? null : _initializeLocation,
         tooltip: 'Atualizar Localização',
         child: _isLoadingLocation 
             ? const SizedBox(
@@ -230,7 +285,7 @@ class _SensorsDemoScreenState extends State<SensorsDemoScreen> {
               ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: _getCurrentLocation,
+              onPressed: _initializeLocation,
               icon: const Icon(Icons.refresh),
               label: const Text('Tentar Novamente'),
             ),

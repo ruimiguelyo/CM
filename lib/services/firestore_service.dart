@@ -295,7 +295,7 @@ class FirestoreService {
     try {
       // Primeiro, buscar produtos da categoria especificada
       final QuerySnapshot productSnapshot = await FirebaseFirestore.instance
-          .collection('products')
+          .collectionGroup('products')
           .where('categoria', isEqualTo: categoria)
           .get();
 
@@ -311,18 +311,19 @@ class FirestoreService {
       // Buscar produtores pelos IDs
       final List<UserModel> producers = [];
       
-      // Firestore tem limite de 10 IDs por consulta whereIn
+      // Firestore tem limite de 30 IDs por consulta 'in' (era 10, mas foi aumentado)
       final List<List<String>> chunks = [];
       final List<String> idList = producerIds.toList();
       
-      for (int i = 0; i < idList.length; i += 10) {
+      for (int i = 0; i < idList.length; i += 30) {
         chunks.add(idList.sublist(
           i, 
-          i + 10 > idList.length ? idList.length : i + 10
+          i + 30 > idList.length ? idList.length : i + 30
         ));
       }
 
       for (final chunk in chunks) {
+        if (chunk.isEmpty) continue;
         final QuerySnapshot userSnapshot = await FirebaseFirestore.instance
             .collection('users')
             .where(FieldPath.documentId, whereIn: chunk)
@@ -350,7 +351,7 @@ class FirestoreService {
       // Buscar todos os produtores com coordenadas válidas
       final QuerySnapshot snapshot = await FirebaseFirestore.instance
           .collection('users')
-          .where('tipoUtilizador', isEqualTo: 'agricultor')
+          .where('tipo', isEqualTo: 'agricultor')
           .where('latitude', isNotEqualTo: null)
           .where('longitude', isNotEqualTo: null)
           .get();
@@ -404,7 +405,7 @@ class FirestoreService {
   Future<List<String>> getAvailableCategories() async {
     try {
       final QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('products')
+          .collectionGroup('products')
           .get();
 
       final Set<String> categories = {};

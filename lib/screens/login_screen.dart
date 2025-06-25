@@ -159,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text('Acesso Rápido (Desenvolvimento)', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade600)),
                 const SizedBox(height: 12),
                 
-                // Consumidores
+                // Consumidores (Zona de Braga - 5-30km)
                 Text('Consumidores:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade700)),
                 const SizedBox(height: 8),
                 Wrap(
@@ -170,13 +170,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     _buildQuickLoginButton('Tiago Mendes', 'tiago.mendes@email.pt', Colors.blue),
                     _buildQuickLoginButton('Carla Nunes', 'carla.nunes@email.pt', Colors.blue),
                     _buildQuickLoginButton('Bruno Dias', 'bruno.dias@email.pt', Colors.blue),
-                    _buildQuickLoginButton('Patrícia Lima', 'patricia.lima@email.pt', Colors.blue),
+                    _buildQuickLoginButton('Luís Cardoso', 'luis.cardoso@email.pt', Colors.blue),
                   ],
                 ),
                 
                 const SizedBox(height: 16),
                 
-                // Produtores
+                // Produtores (Região de Braga - 5-30km)
                 Text('Produtores:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade700)),
                 const SizedBox(height: 8),
                 Wrap(
@@ -187,12 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     _buildQuickLoginButton('Maria Santos', 'maria.santos@verde.pt', Colors.green),
                     _buildQuickLoginButton('António Costa', 'antonio.costa@bio.pt', Colors.green),
                     _buildQuickLoginButton('Ana Ferreira', 'ana.ferreira@natural.pt', Colors.green),
-                    _buildQuickLoginButton('Carlos Oliveira', 'carlos.oliveira@campo.pt', Colors.green),
-                    _buildQuickLoginButton('Isabel Rodrigues', 'isabel.rodrigues@terra.pt', Colors.green),
-                    _buildQuickLoginButton('Pedro Almeida', 'pedro.almeida@fresco.pt', Colors.green),
-                    _buildQuickLoginButton('Luísa Martins', 'luisa.martins@organico.pt', Colors.green),
-                    _buildQuickLoginButton('Miguel Pereira', 'miguel.pereira@sustentavel.pt', Colors.green),
-                    _buildQuickLoginButton('Sofia Gomes', 'sofia.gomes@tradicional.pt', Colors.green),
+                    _buildQuickLoginButton('Patrícia Lima', 'patricia.lima@campo.pt', Colors.green),
                   ],
                 ),
                 

@@ -35,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Coordenadas padrão (centro de Portugal)
   static const LatLng _defaultLocation = LatLng(39.5, -8.0);
 
-  bool _isMapView = false;
+  final bool _isMapView = false;
   List<UserModel> _producers = [];
   List<UserModel> _filteredProducers = [];
   List<String> _availableCategories = [];
@@ -48,22 +48,62 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadInitialData();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadInitialData() async {
+    // 1. Obter a localização primeiro, pois é essencial para os filtros
+    await _initializeLocation();
+
+    // 2. Carregar produtores e categorias em paralelo
     await Future.wait([
       _loadProducers(),
       _loadCategories(),
-      _getCurrentLocation(),
     ]);
+
+    // 3. Aplicar os filtros iniciais (especialmente o de distância)
+    if (mounted) {
+      await _applyFilters();
+    }
   }
 
-  Future<void> _getCurrentLocation() async {
+  Future<void> _initializeLocation() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      final userModel = await _firestoreService.getUser(currentUser.uid).first;
+      // Prioridade para a localização guardada no perfil do utilizador
+      if (userModel.latitude != null && userModel.longitude != null) {
+        if (mounted) {
+          setState(() {
+            _currentPosition = Position(
+              latitude: userModel.latitude!,
+              longitude: userModel.longitude!,
+              timestamp: DateTime.now(),
+              accuracy: 0.0,
+              altitude: 0.0,
+              altitudeAccuracy: 0.0,
+              heading: 0.0,
+              headingAccuracy: 0.0,
+              speed: 0.0,
+              speedAccuracy: 0.0,
+            );
+          });
+        }
+        return; // Sair após usar a localização guardada
+      }
+    }
+
+    // Fallback: se não houver utilizador ou se o utilizador não tiver localização,
+    // tenta obter a localização do dispositivo físico.
     try {
-      _currentPosition = await _locationService.getCurrentLocation();
+      final position = await _locationService.getCurrentLocation();
+      if (mounted) {
+        setState(() {
+          _currentPosition = position;
+        });
+      }
     } catch (e) {
-      print('Erro ao obter localização: $e');
+      print('Erro ao obter localização do dispositivo: $e');
     }
   }
 
@@ -114,29 +154,39 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       List<UserModel> filteredProducers = [];
 
+      // Começar sempre com todos os produtores
+      filteredProducers = await _firestoreService.getAgricultores().first;
+
+      // Aplicar filtro de categoria se selecionado
       if (_selectedCategory != null) {
-        // Filtrar por categoria
-        filteredProducers = await FirestoreService().getProducersByCategory(_selectedCategory!);
-      } else {
-        // Carregar todos os produtores
-        filteredProducers = await _firestoreService.getAgricultores().first;
+        final categoryProducers = await FirestoreService().getProducersByCategory(_selectedCategory!);
+        final categoryIds = categoryProducers.map((p) => p.uid).toSet();
+        filteredProducers = filteredProducers.where((p) => categoryIds.contains(p.uid)).toList();
       }
 
-      // Aplicar filtro de distância se a localização atual estiver disponível
+      // Aplicar filtro de distância APENAS se a localização atual estiver disponível
+      // Se não houver localização, mantém todos os produtores (não aplica filtro de distância)
       if (_currentPosition != null) {
-        filteredProducers = await FirestoreService().getProducersWithinDistance(
-          _currentPosition!.latitude,
-          _currentPosition!.longitude,
-          _maxDistance,
-        );
+        filteredProducers = filteredProducers.where((producer) {
+          // Se o produtor não tem coordenadas, mantém na lista (não exclui)
+          if (producer.latitude == null || producer.longitude == null) {
+            return true; 
+          }
 
-        // Se também há filtro de categoria, fazer interseção
-        if (_selectedCategory != null) {
-          final categoryProducers = await FirestoreService().getProducersByCategory(_selectedCategory!);
-          final categoryIds = categoryProducers.map((p) => p.uid).toSet();
-          filteredProducers = filteredProducers.where((p) => categoryIds.contains(p.uid)).toList();
-        }
+          final distanceInMeters = _locationService.calculateDistance(
+            _currentPosition!.latitude,
+            _currentPosition!.longitude,
+            producer.latitude!,
+            producer.longitude!,
+          );
+
+          // Converter metros para quilómetros para comparar com _maxDistance
+          final distanceInKm = distanceInMeters / 1000;
+
+          return distanceInKm <= _maxDistance;
+        }).toList();
       }
+      // Se não há posição atual, não aplica filtro de distância (mantém todos)
 
       if (mounted) {
         setState(() {
@@ -148,6 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
       print('Erro ao aplicar filtros: $e');
       if (mounted) {
         setState(() {
+          _filteredProducers = _producers; // Fallback para todos os produtores
           _isLoadingProducers = false;
         });
       }

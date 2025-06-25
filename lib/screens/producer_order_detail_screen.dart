@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:hellofarmer_app/models/order_model.dart';
 import 'package:hellofarmer_app/models/user_model.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
-import 'package:intl/intl.dart';
 
 class ProducerOrderDetailScreen extends StatefulWidget {
   final OrderModel order;

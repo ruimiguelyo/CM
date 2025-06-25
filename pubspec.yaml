@@ -53,6 +53,9 @@ dependencies:
   geolocator: ^10.1.0
   google_maps_flutter: ^2.5.0
   permission_handler: ^11.1.0
+  geocoding: ^3.0.0
+  google_maps_apis: ^3.0.1
+  uuid: ^4.4.0
   # Para animações e UI melhoradas
   lottie: ^2.7.0
   shimmer: ^3.0.0

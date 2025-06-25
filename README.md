@@ -143,7 +143,7 @@ Para facilitar os testes, utilize as seguintes credenciais criadas pelo script d
 - **Email**: `rita.sousa@email.pt`
 - **Password**: `password123`
 - **Nome**: Rita Sousa
-- **Localização**: Lisboa
+- **Localização**: Braga Centro
 
 ### Produtor de Teste
 - **Email**: `joao.silva@farm.pt`
@@ -151,32 +151,40 @@ Para facilitar os testes, utilize as seguintes credenciais criadas pelo script d
 - **Nome**: João Silva
 - **Localização**: Quinta da Esperança, Braga
 
-### Outras Contas Disponíveis
+### 📍 Todas as Contas (Região Norte)
 
-#### Consumidores:
-- `tiago.mendes@email.pt` - Tiago Mendes (Porto)
-- `carla.nunes@email.pt` - Carla Nunes (Faro)
-- `bruno.dias@email.pt` - Bruno Dias (Coimbra)
-- `patricia.lima@email.pt` - Patrícia Lima (Braga)
+#### 👥 Consumidores:
+- `rita.sousa@email.pt` - Rita Sousa (Braga Oeste)
+- `tiago.mendes@email.pt` - Tiago Mendes (Vila Nova de Famalicão)
+- `carla.nunes@email.pt` - Carla Nunes (Póvoa de Lanhoso)
+- `bruno.dias@email.pt` - Bruno Dias (Amares)
+- `luis.cardoso@email.pt` - Luís Cardoso (Guimarães)
 
-#### Produtores:
-- `maria.santos@verde.pt` - Maria Santos (Évora) - Azeites e Mel
-- `antonio.costa@bio.pt` - António Costa (Viseu) - Frutas e Nozes
-- `ana.ferreira@natural.pt` - Ana Ferreira (Coimbra) - Vegetais Biológicos
-- `carlos.oliveira@campo.pt` - Carlos Oliveira (Viana do Castelo) - Raízes e Tubérculos
-- `isabel.rodrigues@terra.pt` - Isabel Rodrigues (Santarém) - Frutos Vermelhos
-- `pedro.almeida@fresco.pt` - Pedro Almeida (Aveiro) - Legumes Frescos
-- `luisa.martins@organico.pt` - Luísa Martins (Guarda) - Cereais Biológicos
-- `miguel.pereira@sustentavel.pt` - Miguel Pereira (Leiria) - Laticínios e Ovos
-- `sofia.gomes@tradicional.pt` - Sofia Gomes (Porto) - Produtos Tradicionais
+#### 🌱 Produtores:
+- `joao.silva@farm.pt` - João Silva (Braga Centro) - Legumes e Ervas
+- `maria.santos@verde.pt` - Maria Santos (Vila Verde) - Azeites e Conservas
+- `antonio.costa@bio.pt` - António Costa (Guimarães) - Frutas e Frutos Secos
+- `ana.ferreira@natural.pt` - Ana Ferreira (Barcelos) - Vegetais Biológicos
+- `patricia.lima@campo.pt` - Patrícia Lima (Vila Verde) - Tubérculos e Raízes
 
 **Todas as contas usam a password**: `password123`
+
+### 🗺️ Localização Geográfica
+Todas as contas estão concentradas na **região de Braga**, com distâncias entre **5-25 km** entre si:
+- **Centro**: Braga
+- **Raio**: 25 km (inclui Guimarães, Barcelos, Esposende, Vila Verde, etc.)
+- **Distâncias máximas**: 25 km (muito mais realistas para entregas locais)
 
 > **💡 Dica**: Para recriar os dados de exemplo, execute o script:
 > ```bash
 > flutter run lib/create_sample_data.dart -d edge --web-port=8081
 > ```
-> Este script irá automaticamente remover contas antigas e criar todas as contas listadas acima com os respetivos produtos e dados de localização.
+> Este script irá automaticamente:
+> - ✅ Remover todas as contas antigas
+> - ✅ Criar 5 produtores e 5 consumidores
+> - ✅ Gerar 25 produtos (5 por produtor)
+> - ✅ Validar distâncias entre 5-50 km
+> - ✅ Configurar coordenadas GPS precisas
 
 ## 📱 Screenshots
 

@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_maps_apis/places.dart';
 import 'package:hellofarmer_app/theme/app_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hellofarmer_app/models/user_model.dart';
 import 'package:hellofarmer_app/services/auth_repository.dart';
+import 'package:hellofarmer_app/services/location_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -28,12 +31,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // Instância do nosso repositório de autenticação
   final AuthRepository _authRepository = AuthRepository();
+  // Instância do serviço de localização
+  final LocationService _locationService = LocationService();
+
+  // Variáveis para a pesquisa de moradas
+  Timer? _debounce;
+  List<Prediction> _predictions = [];
+  bool _isSearching = false;
+  String? _sessionToken;
+  final FocusNode _moradaFocusNode = FocusNode();
+
   // Estado para controlar o loading
   bool _isLoading = false;
+
+  // Novas variáveis para guardar as coordenadas
+  double? _latitude;
+  double? _longitude;
+
+  @override
+  void initState() {
+    super.initState();
+    // Gerar um token de sessão quando o ecrã é iniciado
+    _sessionToken = _locationService.generateSessionToken();
+    _moradaFocusNode.addListener(() {
+      if (!_moradaFocusNode.hasFocus) {
+        // Se o campo de morada perde o foco, limpa as sugestões
+        setState(() {
+          _predictions = [];
+        });
+      }
+    });
+  }
 
   // É importante limpar os controladores quando o widget é removido da árvore.
   @override
   void dispose() {
+    _debounce?.cancel();
+    _moradaFocusNode.dispose();
     _nomeController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -44,6 +78,88 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _codigoPostalController.dispose();
     super.dispose();
   }
+
+  /// Pesquisa a morada com um debounce para evitar chamadas excessivas à API
+  void _onMoradaChanged(String input) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () async {
+      if (input.isNotEmpty && _moradaFocusNode.hasFocus) {
+        setState(() {
+          _isSearching = true;
+          _predictions = [];
+        });
+        final result = await _locationService.searchPlaces(input, sessionToken: _sessionToken!);
+        if (mounted) {
+          setState(() {
+            _predictions = result;
+            _isSearching = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _predictions = [];
+            _isSearching = false;
+          });
+        }
+      }
+    });
+  }
+
+  /// Chamado quando uma sugestão de morada é selecionada
+  Future<void> _onPredictionSelected(Prediction prediction) async {
+    // Esconder o teclado e limpar sugestões
+    FocusScope.of(context).unfocus();
+    
+    // Mostra loading enquanto busca detalhes
+    setState(() {
+      _moradaController.text = prediction.description ?? '';
+      _predictions = []; 
+      _isSearching = true;
+    });
+
+    final details = await _locationService.getPlaceDetails(prediction.placeId!, sessionToken: _sessionToken!);
+
+    if (details != null && mounted) {
+      // Extrair componentes da morada
+      String streetName = '';
+      String streetNumber = '';
+      String postalCode = '';
+      String city = '';
+
+      if (details.addressComponents != null) {
+        for (var component in details.addressComponents!) {
+          if (component.types?.contains('route') ?? false) {
+            streetName = component.longName ?? '';
+          }
+          if (component.types?.contains('street_number') ?? false) {
+            streetNumber = component.longName ?? '';
+          }
+          if (component.types?.contains('postal_code') ?? false) {
+            postalCode = component.longName ?? '';
+          }
+          if (component.types?.contains('postal_town') ?? false || (component.types?.contains('locality') ?? false)) {
+            city = component.longName ?? '';
+          }
+        }
+      }
+
+      setState(() {
+        _moradaController.text = '$streetName, $streetNumber'.trim().replaceAll(RegExp(r',$'), '');
+        _codigoPostalController.text = postalCode;
+        _latitude = details.geometry?.location.lat;
+        _longitude = details.geometry?.location.lng;
+        _isSearching = false;
+      });
+    } else if (mounted) {
+      setState(() => _isSearching = false);
+      _showErrorSnackBar('Não foi possível obter os detalhes da morada.');
+    }
+
+    // Gerar um novo token de sessão para a próxima pesquisa
+    _sessionToken = _locationService.generateSessionToken();
+  }
+
 
   // Método principal para o registo do utilizador
   Future<void> _registerUser() async {
@@ -76,6 +192,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           telefone: _telefoneController.text.trim(),
           morada: _moradaController.text.trim(),
           codigoPostal: _codigoPostalController.text.trim(),
+          latitude: _latitude,
+          longitude: _longitude,
         );
 
         // Guardar o objeto UserModel (convertido para Map) no Firestore
@@ -152,7 +270,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       ),
       body: SingleChildScrollView(
-        child: Container(
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
           // Envolvemos a nossa coluna com um widget Form
           child: Form(
@@ -232,9 +350,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
+                
+                // CAMPO DE MORADA COM AUTOCOMPLETE
                 TextFormField(
                   controller: _moradaController,
-                  decoration: const InputDecoration(labelText: 'Morada', prefixIcon: Icon(Icons.home_outlined)),
+                  focusNode: _moradaFocusNode,
+                  onChanged: _onMoradaChanged,
+                  decoration: const InputDecoration(
+                    labelText: 'Pesquisar Morada', 
+                    prefixIcon: Icon(Icons.home_outlined)
+                  ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Por favor, introduza a sua morada.';
@@ -242,6 +367,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     return null;
                   },
                 ),
+                // LISTA DE SUGESTÕES
+                if (_isSearching)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_predictions.isNotEmpty)
+                  SizedBox(
+                    height: 200,
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _predictions.length,
+                      itemBuilder: (context, index) {
+                        final prediction = _predictions[index];
+                        return ListTile(
+                          leading: const Icon(Icons.location_on_outlined),
+                          title: Text(prediction.description ?? ''),
+                          onTap: () => _onPredictionSelected(prediction),
+                        );
+                      },
+                    ),
+                  ),
+
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _codigoPostalController,
@@ -253,8 +401,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 32),
-
+                const SizedBox(height: 24),
+                
                 // --- BOTÃO DE REGISTO ---
                 ElevatedButton(
                   // Desativamos o botão enquanto estiver a carregar e chamamos o _registerUser

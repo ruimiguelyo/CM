@@ -4,12 +4,60 @@ import 'package:hellofarmer_app/models/order_model.dart';
 import 'package:hellofarmer_app/models/user_model.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
 import 'package:intl/intl.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:hellofarmer_app/services/location_service.dart';
 // Adicionar o ecrã de avaliação que será criado a seguir
 import 'package:hellofarmer_app/screens/evaluation_screen.dart';
 
-class OrderDetailScreen extends StatelessWidget {
+class OrderDetailScreen extends StatefulWidget {
   final OrderModel order;
   const OrderDetailScreen({super.key, required this.order});
+
+  @override
+  State<OrderDetailScreen> createState() => _OrderDetailScreenState();
+}
+
+class _OrderDetailScreenState extends State<OrderDetailScreen> {
+  final LocationService _locationService = LocationService();
+  GoogleMapController? _mapController;
+  Set<Marker> _markers = {};
+  LatLng? _deliveryLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeDeliveryLocation();
+  }
+
+  void _initializeDeliveryLocation() async {
+    try {
+      // Usa as coordenadas de entrega guardadas na encomenda
+      if (widget.order.deliveryLatitude != null && widget.order.deliveryLongitude != null) {
+        _deliveryLocation = LatLng(widget.order.deliveryLatitude!, widget.order.deliveryLongitude!);
+      } else {
+        // Fallback para uma localização padrão se não houver coordenadas
+        _deliveryLocation = const LatLng(39.5, -8.0); 
+      }
+      
+      if (mounted) {
+        setState(() {
+          _markers = {
+            Marker(
+              markerId: const MarkerId('delivery'),
+              position: _deliveryLocation!,
+              infoWindow: InfoWindow(
+                title: 'Local de Entrega',
+                snippet: widget.order.shippingAddress['morada'],
+              ),
+              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+            ),
+          };
+        });
+      }
+    } catch (e) {
+      print('Erro ao configurar localização de entrega: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,16 +71,16 @@ class OrderDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Cabeçalho
-            Text('Encomenda #${order.id!.substring(0, 8)}', style: Theme.of(context).textTheme.headlineSmall),
-            Text(DateFormat('d MMMM y, HH:mm').format(order.orderDate.toDate())),
+            Text('Encomenda #${widget.order.id!.substring(0, 8)}', style: Theme.of(context).textTheme.headlineSmall),
+            Text(DateFormat('d MMMM y, HH:mm').format(widget.order.orderDate.toDate())),
             const SizedBox(height: 24),
             
             // Itens da Encomenda
             _buildOrderItems(context),
             const SizedBox(height: 24),
 
-            // Mapa estático (simulação)
-            _buildMapPlaceholder(context),
+            // Mapa de entrega
+            _buildDeliveryMap(context),
             const SizedBox(height: 24),
             
             // Morada de Entrega
@@ -42,7 +90,7 @@ class OrderDetailScreen extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
-                  '${order.shippingAddress['morada']}\n${order.shippingAddress['codigoPostal']}',
+                  '${widget.order.shippingAddress['morada']}\n${widget.order.shippingAddress['codigoPostal']}',
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ),
@@ -52,7 +100,7 @@ class OrderDetailScreen extends StatelessWidget {
             // Estado da Encomenda
             Text('Estado da Encomenda', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
-            _buildStatusTracker(context, order.status),
+            _buildStatusTracker(context, widget.order.status),
 
             // Botão para avaliar a encomenda (visível apenas para consumidores e se a encomenda estiver entregue)
             _buildEvaluationButton(context),
@@ -70,10 +118,10 @@ class OrderDetailScreen extends StatelessWidget {
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: order.items.length,
+            itemCount: widget.order.items.length,
             separatorBuilder: (context, index) => const Divider(indent: 16, endIndent: 16),
             itemBuilder: (context, index) {
-              final item = order.items[index];
+              final item = widget.order.items[index];
               return ListTile(
                 leading: Image.network(item.product.imagemUrl, width: 50, height: 50, fit: BoxFit.cover, 
                   errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
@@ -91,7 +139,7 @@ class OrderDetailScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Total', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                Text('€${order.total.toStringAsFixed(2)}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                Text('€${widget.order.total.toStringAsFixed(2)}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
               ],
             ),
           )
@@ -100,7 +148,7 @@ class OrderDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMapPlaceholder(BuildContext context) {
+  Widget _buildDeliveryMap(BuildContext context) {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -108,25 +156,76 @@ class OrderDetailScreen extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 16.0, left: 16.0),
-            child: Text("Localização", style: Theme.of(context).textTheme.titleLarge),
+            child: Text("Localização de Entrega", style: Theme.of(context).textTheme.titleLarge),
           ),
           const SizedBox(height: 8),
-          // Usamos uma imagem estática para simular o mapa
-          Image.asset('assets/map_placeholder.png', 
-            fit: BoxFit.cover, 
-            width: double.infinity,
-            height: 150,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                height: 150,
-                color: Colors.grey[200],
-                child: const Center(child: Text('Não foi possível carregar o mapa.')),
-              );
-            }
+          SizedBox(
+            height: 200,
+            child: _deliveryLocation != null 
+              ? _buildMapWidget()
+              : Container(
+                  color: Colors.grey[200],
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.location_on, size: 40, color: Colors.grey),
+                        SizedBox(height: 8),
+                        Text('A carregar localização...'),
+                      ],
+                    ),
+                  ),
+                ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildMapWidget() {
+    try {
+      return GoogleMap(
+        onMapCreated: (GoogleMapController controller) {
+          _mapController = controller;
+        },
+        initialCameraPosition: CameraPosition(
+          target: _deliveryLocation!,
+          zoom: 13.0,
+        ),
+        markers: _markers,
+        zoomControlsEnabled: true,
+        compassEnabled: true,
+        myLocationButtonEnabled: false,
+        mapType: MapType.normal,
+      );
+    } catch (e) {
+      // Fallback se o Google Maps não estiver disponível
+      return Container(
+        color: Colors.grey.shade100,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.map_outlined, size: 50, color: Colors.grey.shade400),
+            const SizedBox(height: 8),
+            Text(
+              'Mapa indisponível',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+            if (_deliveryLocation != null)
+              Text(
+                '${_deliveryLocation!.latitude.toStringAsFixed(4)}, ${_deliveryLocation!.longitude.toStringAsFixed(4)}',
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              ),
+            const SizedBox(height: 8),
+            Text(
+              widget.order.shippingAddress['morada'] ?? '',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildStatusTracker(BuildContext context, String currentStatus) {
@@ -189,9 +288,9 @@ class OrderDetailScreen extends StatelessWidget {
 
         final user = snapshot.data!;
         // Apenas mostra o botão se for um consumidor e a encomenda estiver entregue
-        if (user.tipo == 'consumidor' && order.status == 'Entregue') {
+        if (user.tipo == 'consumidor' && widget.order.status == 'Entregue') {
           // Verifica se a encomenda já foi avaliada
-          final bool alreadyReviewed = order.orderRating != null;
+          final bool alreadyReviewed = widget.order.orderRating != null;
           
           return Padding(
             padding: const EdgeInsets.only(top: 24.0),
@@ -200,7 +299,7 @@ class OrderDetailScreen extends StatelessWidget {
               label: Text(alreadyReviewed ? 'Editar Avaliação' : 'Avaliar Encomenda'),
               onPressed: () {
                 Navigator.of(context).push(MaterialPageRoute(
-                  builder: (context) => EvaluationScreen(order: order),
+                  builder: (context) => EvaluationScreen(order: widget.order),
                 ));
               },
             ),

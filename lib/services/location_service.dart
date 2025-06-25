@@ -1,14 +1,26 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/foundation.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:google_maps_apis/places.dart';
+import 'package:uuid/uuid.dart';
+
+// NOTA: Esta API Key precisa de ter a "Places API" ativa na Consola Google Cloud.
+// Foi retirada do ficheiro firebase_options.dart.
+const String _kGoogleApiKey = "AIzaSyDF2qdqOBav6_32TAHP3FSrLpvYPKuAbH8";
 
 class LocationService {
   static final LocationService _instance = LocationService._internal();
   factory LocationService() => _instance;
-  LocationService._internal();
+  LocationService._internal() {
+    _places = GoogleMapsPlaces(apiKey: _kGoogleApiKey);
+  }
 
   Position? _currentPosition;
   bool _isLocationEnabled = false;
+
+  // Instância do serviço do Google Places
+  late final GoogleMapsPlaces _places;
 
   Position? get currentPosition => _currentPosition;
   bool get isLocationEnabled => _isLocationEnabled;
@@ -133,16 +145,72 @@ class LocationService {
   }
 
   /// Obtém o endereço a partir de coordenadas (geocoding reverso)
-  Future<String> getAddressFromCoordinates(double latitude, double longitude) async {
+  /// Retorna um objeto Placemark que contém os detalhes da morada.
+  Future<Placemark?> getAddressFromCoordinates(double latitude, double longitude) async {
     try {
-      // Para implementação completa, seria necessário usar o package geocoding
-      // Por agora, retornamos as coordenadas formatadas
-      return 'Lat: ${latitude.toStringAsFixed(6)}, Lng: ${longitude.toStringAsFixed(6)}';
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        latitude,
+        longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        return placemarks.first;
+      }
+      return null;
     } catch (e) {
-      print('Erro ao obter endereço: $e');
-      return 'Erro ao obter endereço';
+      print('Erro no geocoding reverso: $e');
+      return null;
     }
   }
 
+  /// Gera um token de sessão para as pesquisas na Places API
+  String generateSessionToken() {
+    return const Uuid().v4();
+  }
 
+  /// Pesquisa moradas usando o autocompletar da Google Places API
+  Future<List<Prediction>> searchPlaces(String input, {required String sessionToken}) async {
+    if (input.isEmpty) {
+      return [];
+    }
+    try {
+      final response = await _places.autocomplete(
+        input,
+        sessionToken: sessionToken,
+        language: 'pt',
+        components: [Component(Component.country, "pt")], // Restringe a Portugal
+      );
+
+      if (response.status == "OK") {
+        return response.predictions ?? [];
+      } else {
+        debugPrint('Erro na API Places: ${response.errorMessage}');
+        return [];
+      }
+    } catch (e) {
+      debugPrint('Erro ao pesquisar morada: $e');
+      return [];
+    }
+  }
+
+  /// Obtém os detalhes de uma morada a partir do seu placeId
+  Future<PlaceDetails?> getPlaceDetails(String placeId, {required String sessionToken}) async {
+    try {
+      final response = await _places.getDetailsByPlaceId(
+        placeId,
+        sessionToken: sessionToken,
+        language: 'pt',
+      );
+
+      if (response.status == "OK") {
+        return response.result;
+      } else {
+        debugPrint('Erro na API Place Details: ${response.errorMessage}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Erro ao obter detalhes da morada: $e');
+      return null;
+    }
+  }
 } 
