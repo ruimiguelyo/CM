@@ -20,18 +20,19 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 Future<void> main() async {
-  // Garantimos que os bindings do Flutter estão inicializados antes de chamar o Firebase.
   WidgetsFlutterBinding.ensureInitialized();
-  // Inicializamos o Firebase com as opções da plataforma atual.
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } on FirebaseException catch (e) {
+    if (e.code != 'duplicate-app') {
+      rethrow;
+    }
+  }
 
-  // Define o handler de mensagens em segundo plano, APENAS se não for web,
-  // pois esta função não é suportada nessa plataforma e causa um crash.
   if (!kIsWeb) {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-    // O serviço de notificações também só deve ser inicializado em mobile.
     await NotificationService().initNotifications();
   }
 

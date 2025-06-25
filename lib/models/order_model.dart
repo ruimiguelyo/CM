@@ -71,7 +71,7 @@ class OrderModel {
       items: (data['items'] as List)
           .map((itemData) => CartItemModel.fromMap(itemData))
           .toList(),
-      total: data['total'],
+      total: (data['total'] as num).toDouble(),
       orderDate: data['orderDate'],
       status: data['status'],
       shippingAddress: Map<String, String>.from(data['shippingAddress'] ?? {}),

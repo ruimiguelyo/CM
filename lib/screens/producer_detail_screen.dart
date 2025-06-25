@@ -8,6 +8,7 @@ import 'package:hellofarmer_app/models/order_model.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:hellofarmer_app/screens/product_detail_screen.dart';
 
 class ProducerDetailScreen extends StatefulWidget {
   final String producerId;
@@ -254,55 +255,96 @@ class _ProducerDetailScreenState extends State<ProducerDetailScreen> {
           physics: const NeverScrollableScrollPhysics(),
           itemCount: products.length,
           itemBuilder: (context, index) {
-            final product = products[index];
-            final cart = Provider.of<CartProvider>(context, listen: false);
+            return _buildProductCard(context, products[index]);
+          },
+        );
+      },
+    );
+  }
 
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ListTile(
-                leading: const Icon(Icons.shopping_basket_outlined, size: 40),
-                title: Text(product.nome),
-                subtitle: Column(
+  Widget _buildProductCard(BuildContext context, ProductModel product) {
+    final bool isAvailable = product.stock > 0;
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => ProductDetailScreen(product: product),
+          ));
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            children: [
+              // Imagem do Produto
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: product.imagemUrl.isNotEmpty
+                    ? Image.network(
+                        product.imagemUrl,
+                        width: 70,
+                        height: 70,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _buildPlaceholderImage(),
+                      )
+                    : _buildPlaceholderImage(),
+              ),
+              const SizedBox(width: 16),
+              // Informação do Produto
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${product.preco.toStringAsFixed(2)} € / ${product.unidade}'),
                     Text(
-                      product.stock > 0 ? 'Disponível: ${product.stock.toStringAsFixed(0)}' : 'Esgotado',
+                      product.nome,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text('€${product.preco.toStringAsFixed(2)} / ${product.unidade}'),
+                    const SizedBox(height: 4),
+                    Text(
+                      isAvailable ? 'Disponível: ${product.stock.toStringAsFixed(0)}' : 'Esgotado',
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: product.stock > 0 ? Colors.green : Colors.red,
+                        color: isAvailable ? Colors.green.shade700 : Colors.red,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.add_shopping_cart),
-                  color: product.stock > 0 ? Theme.of(context).primaryColor : Colors.grey,
-                  tooltip: 'Adicionar ao Carrinho',
-                  onPressed: product.stock > 0
-                      ? () {
-                          cart.addItem(product);
-                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${product.nome} adicionado ao carrinho!'),
-                              duration: const Duration(seconds: 2),
-                              action: SnackBarAction(
-                                label: 'VER',
-                                onPressed: () {
-                                  // TODO: Navegar para o ecrã do carrinho
-                                },
-                              ),
-                            ),
-                          );
-                        }
-                      : null,
-                ),
               ),
-            );
-          },
-        );
-      },
+              const SizedBox(width: 8),
+              // Ícone de Adicionar ao Carrinho
+              if (isAvailable)
+                IconButton(
+                  icon: const Icon(Icons.add_shopping_cart),
+                  color: Theme.of(context).primaryColor,
+                  onPressed: () {
+                    context.read<CartProvider>().addItem(product);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${product.nome} adicionado ao carrinho!'),
+                        backgroundColor: Theme.of(context).primaryColor,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderImage() {
+    return Container(
+      width: 70,
+      height: 70,
+      color: Colors.grey.shade200,
+      child: const Icon(Icons.inventory_2_outlined, color: Colors.grey),
     );
   }
 

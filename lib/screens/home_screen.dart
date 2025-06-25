@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hellofarmer_app/models/user_model.dart';
@@ -15,6 +16,8 @@ import 'package:hellofarmer_app/screens/favorites_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:hellofarmer_app/services/location_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/widgets.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,15 +30,21 @@ class _HomeScreenState extends State<HomeScreen> {
   final FirestoreService _firestoreService = FirestoreService();
   final LocationService _locationService = LocationService();
   
-  GoogleMapController? _mapController;
+  // Controller para o mapa
+  final Completer<GoogleMapController> _mapController = Completer();
+
+  // O Set<Marker> é a única coisa que precisa ser um estado para o mapa
   Set<Marker> _markers = {};
+
   Position? _currentPosition;
-  bool _showMap = false;
   
   // Coordenadas padrão (centro de Portugal)
-  static const LatLng _defaultLocation = LatLng(39.5, -8.0);
+  static const CameraPosition _defaultCameraPosition = CameraPosition(
+    target: LatLng(39.5, -8.0),
+    zoom: 7,
+  );
 
-  final bool _isMapView = false;
+  bool _isMapView = false;
   List<UserModel> _producers = [];
   List<UserModel> _filteredProducers = [];
   List<String> _availableCategories = [];
@@ -44,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingProducers = true;
   bool _isLoadingCategories = true;
   bool _showFilters = false;
+  UserModel? _currentUserModel;
 
   @override
   void initState() {
@@ -52,77 +62,99 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    // 1. Obter a localização primeiro, pois é essencial para os filtros
-    await _initializeLocation();
-
-    // 2. Carregar produtores e categorias em paralelo
+    // Carregamos tudo em paralelo para um arranque mais rápido
     await Future.wait([
-      _loadProducers(),
+      _initializeLocationAndMoveCamera(),
+      _loadProducersAndApplyFilters(), // Combina o carregamento e o filtro inicial
       _loadCategories(),
+      _loadCurrentUser(),
     ]);
+  }
 
-    // 3. Aplicar os filtros iniciais (especialmente o de distância)
-    if (mounted) {
-      await _applyFilters();
+  // NOVO: Carrega os dados do utilizador atual uma vez
+  Future<void> _loadCurrentUser() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final userModel = await _firestoreService.getUser(user.uid).first;
+      if (mounted) {
+        setState(() {
+          _currentUserModel = userModel;
+        });
+      }
     }
   }
 
-  Future<void> _initializeLocation() async {
+  // Combina o carregamento de produtores com a aplicação inicial de filtros
+  Future<void> _loadProducersAndApplyFilters() async {
+    setState(() {
+      _isLoadingProducers = true;
+    });
+    try {
+      final producers = await _firestoreService.getAgricultores().first;
+      if (!mounted) return;
+
+      setState(() {
+        _producers = producers;
+      });
+      
+      // Após carregar todos, aplicamos os filtros (distância, etc.)
+      await _applyFilters();
+
+    } catch (e) {
+      print('Erro fatal ao carregar produtores: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingProducers = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _initializeLocationAndMoveCamera() async {
+    Position? userPosition;
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
       final userModel = await _firestoreService.getUser(currentUser.uid).first;
-      // Prioridade para a localização guardada no perfil do utilizador
       if (userModel.latitude != null && userModel.longitude != null) {
-        if (mounted) {
-          setState(() {
-            _currentPosition = Position(
-              latitude: userModel.latitude!,
-              longitude: userModel.longitude!,
-              timestamp: DateTime.now(),
-              accuracy: 0.0,
-              altitude: 0.0,
-              altitudeAccuracy: 0.0,
-              heading: 0.0,
-              headingAccuracy: 0.0,
-              speed: 0.0,
-              speedAccuracy: 0.0,
-            );
-          });
-        }
-        return; // Sair após usar a localização guardada
+        userPosition = Position(
+          latitude: userModel.latitude!,
+          longitude: userModel.longitude!,
+          timestamp: DateTime.now(),
+          accuracy: 0.0,
+          altitude: 0.0,
+          altitudeAccuracy: 0.0,
+          heading: 0.0,
+          headingAccuracy: 0.0,
+          speed: 0.0,
+          speedAccuracy: 0.0,
+        );
       }
     }
 
-    // Fallback: se não houver utilizador ou se o utilizador não tiver localização,
-    // tenta obter a localização do dispositivo físico.
-    try {
-      final position = await _locationService.getCurrentLocation();
-      if (mounted) {
-        setState(() {
-          _currentPosition = position;
-        });
+    if (userPosition == null) {
+      try {
+        userPosition = await _locationService.getCurrentLocation();
+      } catch (e) {
+        print('Erro ao obter localização do dispositivo: $e');
       }
-    } catch (e) {
-      print('Erro ao obter localização do dispositivo: $e');
     }
-  }
 
-  Future<void> _loadProducers() async {
-    try {
-      final producers = await _firestoreService.getAgricultores().first;
-      if (mounted) {
-        setState(() {
-          _producers = producers;
-          _filteredProducers = producers;
-          _isLoadingProducers = false;
-        });
-      }
-    } catch (e) {
-      print('Erro ao carregar produtores: $e');
-      if (mounted) {
-        setState(() {
-          _isLoadingProducers = false;
-        });
+    if (mounted) {
+      setState(() {
+        _currentPosition = userPosition;
+      });
+
+      // Mover a câmara do mapa para a nova posição
+      if (userPosition != null) {
+        final controller = await _mapController.future;
+        controller.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(userPosition.latitude, userPosition.longitude),
+              zoom: 12.0, // Zoom mais apropriado para uma localização específica
+            ),
+          ),
+        );
       }
     }
   }
@@ -151,57 +183,40 @@ class _HomeScreenState extends State<HomeScreen> {
       _isLoadingProducers = true;
     });
 
-    try {
-      List<UserModel> filteredProducers = [];
+    // 1. FAZER TODO O TRABALHO ASSÍNCRONO PRIMEIRO
+    List<UserModel> filtered = List.from(_producers);
 
-      // Começar sempre com todos os produtores
-      filteredProducers = await _firestoreService.getAgricultores().first;
+    if (_selectedCategory != null) {
+      final categoryProducers = await FirestoreService().getProducersByCategory(_selectedCategory!);
+      final categoryIds = categoryProducers.map((p) => p.uid).toSet();
+      filtered = filtered.where((p) => categoryIds.contains(p.uid)).toList();
+    }
 
-      // Aplicar filtro de categoria se selecionado
-      if (_selectedCategory != null) {
-        final categoryProducers = await FirestoreService().getProducersByCategory(_selectedCategory!);
-        final categoryIds = categoryProducers.map((p) => p.uid).toSet();
-        filteredProducers = filteredProducers.where((p) => categoryIds.contains(p.uid)).toList();
-      }
+    if (_currentPosition != null) {
+      filtered = filtered.where((producer) {
+        if (producer.latitude == null || producer.longitude == null) {
+          return true; 
+        }
+        final distanceInKm = _locationService.calculateDistance(
+              _currentPosition!.latitude,
+              _currentPosition!.longitude,
+              producer.latitude!,
+              producer.longitude!,
+            ) / 1000;
+        return distanceInKm <= _maxDistance;
+      }).toList();
+    }
+    
+    // 2. GERAR OS MARCADORES A PARTIR DOS DADOS FINAIS
+    final newMarkers = _generateMarkers(filtered);
 
-      // Aplicar filtro de distância APENAS se a localização atual estiver disponível
-      // Se não houver localização, mantém todos os produtores (não aplica filtro de distância)
-      if (_currentPosition != null) {
-        filteredProducers = filteredProducers.where((producer) {
-          // Se o produtor não tem coordenadas, mantém na lista (não exclui)
-          if (producer.latitude == null || producer.longitude == null) {
-            return true; 
-          }
-
-          final distanceInMeters = _locationService.calculateDistance(
-            _currentPosition!.latitude,
-            _currentPosition!.longitude,
-            producer.latitude!,
-            producer.longitude!,
-          );
-
-          // Converter metros para quilómetros para comparar com _maxDistance
-          final distanceInKm = distanceInMeters / 1000;
-
-          return distanceInKm <= _maxDistance;
-        }).toList();
-      }
-      // Se não há posição atual, não aplica filtro de distância (mantém todos)
-
-      if (mounted) {
-        setState(() {
-          _filteredProducers = filteredProducers;
-          _isLoadingProducers = false;
-        });
-      }
-    } catch (e) {
-      print('Erro ao aplicar filtros: $e');
-      if (mounted) {
-        setState(() {
-          _filteredProducers = _producers; // Fallback para todos os produtores
-          _isLoadingProducers = false;
-        });
-      }
+    // 3. CHAMAR SETSTATE APENAS UMA VEZ COM OS DADOS FINAIS
+    if (mounted) {
+      setState(() {
+        _filteredProducers = filtered;
+        _markers = newMarkers;
+        _isLoadingProducers = false;
+      });
     }
   }
 
@@ -209,8 +224,29 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _selectedCategory = null;
       _maxDistance = 50.0;
-      _filteredProducers = _producers;
     });
+    // Re-aplicar filtros para voltar ao estado inicial (considerando distância)
+    _applyFilters();
+  }
+
+  // Renomeado e modificado para não chamar setState
+  Set<Marker> _generateMarkers(List<UserModel> producers) {
+    return producers
+        .where((p) => p.latitude != null && p.longitude != null)
+        .map((producer) => Marker(
+              markerId: MarkerId(producer.uid),
+              position: LatLng(producer.latitude!, producer.longitude!),
+              infoWindow: InfoWindow(
+                title: producer.nome,
+                snippet: 'Clique para ver detalhes',
+                onTap: () {
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => ProducerDetailScreen(producerId: producer.uid),
+                  ));
+                },
+              ),
+            ))
+        .toSet();
   }
 
   Widget _buildFilterBar() {
@@ -356,195 +392,164 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _onMapCreated(GoogleMapController controller) {
-    _mapController = controller;
+  Widget _buildBodyContent() {
+    if (_isMapView) {
+      return _buildMapView();
+    }
+    return _buildListView();
   }
 
-  void _updateProducerMarkers(List<UserModel> producers) {
-    final Set<Marker> newMarkers = {};
-    
-    // Adicionar marcador da localização atual se disponível
-    if (_currentPosition != null) {
-      newMarkers.add(
-        Marker(
-          markerId: const MarkerId('current_location'),
-          position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-          infoWindow: const InfoWindow(
-            title: 'Minha Localização',
-            snippet: 'Você está aqui',
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-        ),
-      );
-    }
-    
-    // Adicionar marcadores dos produtores
-    for (final producer in producers) {
-      if (producer.latitude != null && producer.longitude != null) {
-        newMarkers.add(
-          Marker(
-            markerId: MarkerId('producer_${producer.uid}'),
-            position: LatLng(producer.latitude!, producer.longitude!),
-            infoWindow: InfoWindow(
-              title: producer.nome,
-              snippet: producer.morada,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => ProducerDetailScreen(producerId: producer.uid),
-                  ),
-                );
-              },
-            ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-          ),
-        );
-      }
-    }
-    
-    // Usar addPostFrameCallback para evitar setState durante build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() {
-          _markers = newMarkers;
-        });
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final authUser = FirebaseAuth.instance.currentUser;
-
-    if (authUser == null) {
-      // Caso de segurança, não deveria acontecer por causa do AuthGate
-      return const Scaffold(body: Center(child: Text("Utilizador não autenticado.")));
-    }
-
-    return StreamBuilder<UserModel>(
-      stream: _firestoreService.getUser(authUser.uid),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+  Widget _buildMapView() {
+    return GoogleMap(
+      mapType: MapType.normal,
+      initialCameraPosition: _defaultCameraPosition,
+      onMapCreated: (GoogleMapController controller) {
+        if (!_mapController.isCompleted) {
+          _mapController.complete(controller);
         }
-        final user = snapshot.data!;
+      },
+      markers: _markers,
+      myLocationEnabled: true,
+      myLocationButtonEnabled: true,
+      padding: const EdgeInsets.only(bottom: 60), // Para não sobrepor o FAB
+    );
+  }
 
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('HelloFarmer'),
-            actions: [
-              // Ícone para GPS
-              IconButton(
-                icon: const Icon(Icons.map),
-                onPressed: () {
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (context) => const SensorsDemoScreen(),
-                  ));
-                },
-                tooltip: 'GPS e Localização',
-              ),
-              // Apenas mostra o ícone do carrinho se for um consumidor
-              if (user.tipo == 'consumidor')
-                Consumer<CartProvider>(
-                  builder: (context, cart, child) => CustomBadge(
-                    value: cart.itemCount.toString(),
-                    child: IconButton(
-                      icon: const Icon(Icons.shopping_cart),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (context) => const CartScreen()),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              if (user.tipo == 'consumidor')
-                IconButton(
-                  icon: const Icon(Icons.favorite_border),
-                  onPressed: () {
-                    Navigator.of(context).push(MaterialPageRoute(
-                      builder: (context) => const FavoritesScreen(),
-                    ));
-                  },
-                ),
-              // Toggle entre vista de lista e mapa para consumidores
-              if (user.tipo == 'consumidor')
-                IconButton(
-                  icon: Icon(_showMap ? Icons.list : Icons.map_outlined),
-                  onPressed: () {
-                    setState(() {
-                      _showMap = !_showMap;
-                    });
-                    // Se mudou para o modo mapa, força atualização dos marcadores
-                    if (_showMap) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        // Trigger rebuild para atualizar marcadores
-                        if (mounted) {
-                          setState(() {});
-                        }
-                      });
-                    }
-                  },
-                  tooltip: _showMap ? 'Ver Lista' : 'Ver Mapa',
-                ),
-              IconButton(
-                icon: const Icon(Icons.person),
-                onPressed: () {
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (context) => const ProfileScreen(),
-                  ));
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout),
-                onPressed: () {
-                  FirebaseAuth.instance.signOut();
-                },
-              ),
-            ],
-          ),
-          body: _buildBody(context, user),
-          // Apenas mostra o botão flutuante se for um consumidor
-          floatingActionButton: user.tipo == 'consumidor'
-              ? FloatingActionButton.extended(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => const AllProductsScreen()),
-                    );
-                  },
-                  label: const Text('Ver Produtos'),
-                  icon: const Icon(Icons.shopping_basket_outlined),
-                )
-              : null,
-        );
+  Widget _buildListView() {
+    if (_isLoadingProducers) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_filteredProducers.isEmpty) {
+      return const Center(child: Text('Nenhum produtor encontrado com os filtros aplicados.'));
+    }
+    return _buildProducersList(_filteredProducers);
+  }
+
+  Widget _buildProducersList(List<UserModel> producers) {
+    return ListView.builder(
+      itemCount: producers.length,
+      itemBuilder: (context, index) {
+        final producer = producers[index];
+        return ProducerCard(
+          producer: producer,
+          currentPosition: _currentPosition,
+          locationService: _locationService,
+        ).animate().fadeIn(duration: 300.ms);
       },
     );
   }
 
-  Widget _buildBody(BuildContext context, UserModel user) {
-    if (user.tipo == 'consumidor') {
-      // Mostra a lista de produtores para o consumidor com filtros
-      return Column(
-        children: [
-          _buildFilterBar(),
-          Expanded(
-            child: _isLoadingProducers 
-              ? const Center(child: CircularProgressIndicator())
-              : _filteredProducers.isEmpty
-                ? const Center(
-                    child: Text('Nenhum produtor encontrado com os filtros aplicados.'),
-                  )
-                                 : _buildContent(),
+  @override
+  Widget build(BuildContext context) {
+    // Em vez de StreamBuilder, usamos a variável de estado _currentUserModel.
+    if (_currentUserModel == null) {
+      // Ecrã de carregamento enquanto o utilizador não é carregado
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // A lógica para determinar a UI é feita aqui, uma vez por build.
+    final bool isConsumer = _currentUserModel!.tipo == 'consumidor';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('HelloFarmer'),
+        actions: [
+          // Ícone para GPS (removido temporariamente se não for usado)
+          // IconButton(
+          //   icon: const Icon(Icons.map),
+          //   onPressed: () {
+          //     Navigator.of(context).push(MaterialPageRoute(
+          //       builder: (context) => const SensorsDemoScreen(),
+          //     ));
+          //   },
+          //   tooltip: 'GPS e Localização',
+          // ),
+          // Apenas mostra o ícone do carrinho se for um consumidor
+          if (isConsumer)
+            Consumer<CartProvider>(
+              builder: (context, cart, child) => CustomBadge(
+                value: cart.itemCount.toString(),
+                child: IconButton(
+                  icon: const Icon(Icons.shopping_cart),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => const CartScreen()),
+                    );
+                  },
+                ),
+              ),
+            ),
+          if (isConsumer)
+            IconButton(
+              icon: const Icon(Icons.favorite_border),
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => const FavoritesScreen(),
+                ));
+              },
+            ),
+          // Toggle entre vista de lista e mapa para consumidores
+          if (isConsumer)
+            IconButton(
+              icon: Icon(_isMapView ? Icons.list : Icons.map_outlined),
+              tooltip: _isMapView ? 'Ver Lista' : 'Ver Mapa',
+              onPressed: () {
+                setState(() {
+                  _isMapView = !_isMapView;
+                });
+              },
+            ),
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => const ProfileScreen(),
+              ));
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              FirebaseAuth.instance.signOut();
+            },
           ),
         ],
-      );
-    } else {
-      // Mostra um dashboard simples para o produtor
-      return Center(
+        automaticallyImplyLeading: false,
+      ),
+      // O corpo da UI depende se é consumidor ou produtor
+      body: isConsumer
+          ? Column(
+              children: [
+                _buildFilterBar(),
+                Expanded(child: _buildBodyContent()),
+              ],
+            )
+          : _buildProducerDashboard(), // Dashboard para o produtor
+      
+      // Apenas mostra o botão flutuante se for consumidor E NÃO estiver no mapa
+      floatingActionButton: isConsumer && !_isMapView
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const AllProductsScreen()),
+                );
+              },
+              label: const Text('Ver Produtos'),
+              icon: const Icon(Icons.shopping_basket_outlined),
+            )
+          : null,
+    );
+  }
+
+  // NOVO: Widget para o dashboard do produtor
+  Widget _buildProducerDashboard() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Bem-vindo, ${user.nome}!'),
+            Text('Bem-vindo, ${_currentUserModel!.nome}!', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             const Text('Esta é a sua área de produtor.'),
             const SizedBox(height: 20),
@@ -556,120 +561,67 @@ class _HomeScreenState extends State<HomeScreen> {
               },
               child: const Text('Ver Encomendas Recebidas'),
             ),
+            // Adicionar mais botões e informações relevantes aqui
           ],
         ),
-      );
-    }
+      ),
+    );
   }
+}
 
-  Widget _buildContent() {
-    // Atualizar marcadores se estivermos na vista do mapa
-    if (_showMap) {
-      _updateProducerMarkers(_filteredProducers);
-      return _buildProducersMap();
-    } else {
-      return _buildProducersList(_filteredProducers);
-    }
-  }
+class ProducerCard extends StatelessWidget {
+  final UserModel producer;
+  final Position? currentPosition;
+  final LocationService locationService;
 
-  Widget _buildProducersMap() {
-    try {
-      return GoogleMap(
-        onMapCreated: _onMapCreated,
-        initialCameraPosition: CameraPosition(
-          target: _currentPosition != null 
-              ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
-              : _defaultLocation,
-          zoom: _currentPosition != null ? 10.0 : 6.0,
-        ),
-        markers: _markers,
-        myLocationEnabled: true,
-        myLocationButtonEnabled: true,
-        zoomControlsEnabled: true,
-        compassEnabled: true,
-        mapType: MapType.normal,
-      );
-    } catch (e) {
-      // Fallback se o Google Maps não estiver disponível
-      return Container(
-        color: Colors.grey.shade100,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.map_outlined, size: 80, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'Mapa indisponível',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'A API do Google Maps não está configurada',
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _showMap = false;
-                });
-              },
-              icon: const Icon(Icons.list),
-              label: const Text('Ver Lista'),
-            ),
-          ],
-        ),
-      );
-    }
-  }
+  const ProducerCard({
+    Key? key,
+    required this.producer,
+    required this.currentPosition,
+    required this.locationService,
+  }) : super(key: key);
 
-  Widget _buildProducersList(List<UserModel> agricultores) {
-    return ListView.builder(
-      itemCount: agricultores.length,
-      itemBuilder: (context, index) {
-        final agricultor = agricultores[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: ListTile(
-            leading: const CircleAvatar(
-              child: Icon(Icons.storefront),
-            ),
-            title: Text(agricultor.nome),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(agricultor.morada),
-                if (agricultor.latitude != null && agricultor.longitude != null && _currentPosition != null)
-                  Text(
-                    'Distância: ${_locationService.formatDistance(_locationService.calculateDistance(
-                      _currentPosition!.latitude,
-                      _currentPosition!.longitude,
-                      agricultor.latitude!,
-                      agricultor.longitude!,
-                    ))}',
-                    style: TextStyle(
-                      color: Theme.of(context).primaryColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-              ],
-            ),
-            trailing: agricultor.latitude != null && agricultor.longitude != null 
-                ? const Icon(Icons.location_on, color: Colors.green)
-                : null,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) =>
-                      ProducerDetailScreen(producerId: agricultor.uid),
-                ),
-              );
-            },
-          ),
-        );
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (context) => ProducerDetailScreen(producerId: producer.uid),
+        ));
       },
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                producer.nome,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              if (currentPosition != null &&
+                  producer.latitude != null &&
+                  producer.longitude != null)
+                Row(
+                  children: [
+                    Icon(Icons.location_on, color: Theme.of(context).primaryColor, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${(locationService.calculateDistance(currentPosition!.latitude, currentPosition!.longitude, producer.latitude!, producer.longitude!) / 1000).toStringAsFixed(1)} km de distância',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

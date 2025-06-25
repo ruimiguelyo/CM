@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:hellofarmer_app/models/product_model.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
 import 'package:image_picker/image_picker.dart';
@@ -134,106 +135,163 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
 
   @override
   Widget build(BuildContext context) {
+    bool isEditing = widget.product != null;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.product == null ? 'Adicionar Produto' : 'Editar Produto'),
+        title: Text(isEditing ? 'Editar Produto' : 'Adicionar Produto'),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
+        elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Widget para escolher e pré-visualizar a imagem
-              Container(
-                height: 200,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: _pickedImage != null
-                    ? (kIsWeb
-                        ? Image.network(_pickedImage!.path, fit: BoxFit.cover)
-                        : Image.file(File(_pickedImage!.path), fit: BoxFit.cover))
-                    : (_imagemUrlExistente != null && _imagemUrlExistente!.isNotEmpty)
-                        ? Image.network(_imagemUrlExistente!, fit: BoxFit.cover)
-                        : const Center(child: Text('Nenhuma imagem selecionada.')),
-              ),
-              const SizedBox(height: 8),
-              TextButton.icon(
-                icon: const Icon(Icons.image),
-                label: const Text('Selecionar Imagem'),
-                onPressed: _pickImage,
-              ),
-              const SizedBox(height: 16),
+            children: <Widget>[
+              _buildImagePicker(context),
+              const SizedBox(height: 24),
               TextFormField(
                 controller: _nomeController,
                 decoration: const InputDecoration(labelText: 'Nome do Produto'),
-                validator: (value) => value!.isEmpty ? 'Campo obrigatório' : null,
+                validator: (v) => v!.isEmpty ? 'O nome é obrigatório.' : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _descricaoController,
-                decoration: const InputDecoration(labelText: 'Descrição'),
-                maxLines: 3,
-                validator: (value) => value!.isEmpty ? 'Campo obrigatório' : null,
+                decoration: const InputDecoration(
+                  labelText: 'Descrição',
+                  alignLabelWithHint: true,
+                ),
+                maxLines: 4,
+                validator: (v) => v!.isEmpty ? 'A descrição é obrigatória.' : null,
               ),
               const SizedBox(height: 16),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _precoController,
-                      decoration: const InputDecoration(labelText: 'Preço (€)', prefixIcon: Icon(Icons.euro_symbol)),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) {
-                        if (value!.isEmpty) return 'Obrigatório';
-                        if (double.tryParse(value.replaceAll(',', '.')) == null) return 'Número inválido';
-                        return null;
-                      },
-                    ),
-                  ),
+                  Expanded(child: _buildPriceField()),
                   const SizedBox(width: 16),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _unidadeSelecionada,
-                      decoration: const InputDecoration(labelText: 'Unidade'),
-                      items: _unidades.map((String unidade) {
-                        return DropdownMenuItem<String>(
-                          value: unidade,
-                          child: Text(unidade),
-                        );
-                      }).toList(),
-                      onChanged: (newValue) {
-                        setState(() => _unidadeSelecionada = newValue!);
-                      },
-                    ),
-                  ),
+                  Expanded(child: _buildUnitDropdown()),
                 ],
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _stockController,
-                decoration: const InputDecoration(labelText: 'Stock Disponível', prefixIcon: Icon(Icons.inventory_2_outlined)),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value!.isEmpty) return 'Obrigatório';
-                  if (double.tryParse(value.replaceAll(',', '.')) == null) return 'Número inválido';
+                decoration: const InputDecoration(labelText: 'Stock Disponível'),
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v!.isEmpty) return 'Obrigatório';
+                  if (double.tryParse(v.replaceAll(',', '.')) == null) return 'Inválido';
                   return null;
                 },
               ),
-              const SizedBox(height: 32),
-              ElevatedButton.icon(
-                onPressed: _isLoading ? null : _saveProduct,
-                icon: const Icon(Icons.save),
-                label: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('Guardar'),
-              ),
             ],
-          ),
+          ).animate().fade(duration: 400.ms),
         ),
+      ),
+      bottomNavigationBar: _buildBottomBar(context),
+    );
+  }
+
+  Widget _buildImagePicker(BuildContext context) {
+    return Center(
+      child: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          Container(
+            height: 150,
+            width: 150,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(12),
+              image: _buildImageProvider(),
+            ),
+            child: _buildImageProvider() == null
+                ? const Icon(Icons.image_outlined, size: 50, color: Colors.grey)
+                : null,
+          ),
+          FloatingActionButton.small(
+            onPressed: _pickImage,
+            child: const Icon(Icons.edit),
+          ),
+        ],
+      ),
+    );
+  }
+
+  DecorationImage? _buildImageProvider() {
+    if (_pickedImage != null) {
+      return DecorationImage(
+        image: kIsWeb ? NetworkImage(_pickedImage!.path) : FileImage(File(_pickedImage!.path)) as ImageProvider,
+        fit: BoxFit.cover,
+      );
+    }
+    if (_imagemUrlExistente != null && _imagemUrlExistente!.isNotEmpty) {
+      return DecorationImage(
+        image: NetworkImage(_imagemUrlExistente!),
+        fit: BoxFit.cover,
+      );
+    }
+    return null;
+  }
+
+  Widget _buildPriceField() {
+    return TextFormField(
+      controller: _precoController,
+      decoration: const InputDecoration(labelText: 'Preço (€)'),
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      validator: (v) {
+        if (v!.isEmpty) return 'Obrigatório';
+        if (double.tryParse(v.replaceAll(',', '.')) == null) return 'Inválido';
+        return null;
+      },
+    );
+  }
+
+  Widget _buildUnitDropdown() {
+    return DropdownButtonFormField<String>(
+      value: _unidadeSelecionada,
+      decoration: const InputDecoration(labelText: 'Unidade'),
+      items: _unidades.map((String unidade) {
+        return DropdownMenuItem<String>(value: unidade, child: Text(unidade));
+      }).toList(),
+      onChanged: (newValue) {
+        if (newValue != null) {
+          setState(() => _unidadeSelecionada = newValue);
+        }
+      },
+      validator: (v) => v == null ? 'Obrigatório' : null,
+    );
+  }
+
+  Widget _buildBottomBar(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16).copyWith(bottom: 16 + MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+        border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
+      ),
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _saveProduct,
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+        child: _isLoading
+            ? const SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+              )
+            : const Text('Guardar Produto'),
       ),
     );
   }

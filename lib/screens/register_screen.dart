@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hellofarmer_app/models/user_model.dart';
 import 'package:hellofarmer_app/services/auth_repository.dart';
 import 'package:hellofarmer_app/services/location_service.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -257,179 +258,172 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // A AppBar adiciona um botão de "voltar" automaticamente,
       appBar: AppBar(
-        title: const Text('Cria a tua conta'),
-        backgroundColor: AppTheme.backgroundColor,
+        title: const Text('Criar Conta'),
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppTheme.primaryColor),
-        titleTextStyle: const TextStyle(
-          color: AppTheme.primaryColor,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
+        backgroundColor: Colors.transparent,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
       ),
-      body: SingleChildScrollView(
-        child: Padding(
+      body: SafeArea(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-          // Envolvemos a nossa coluna com um widget Form
           child: Form(
-            key: _formKey, // Associamos a nossa chave ao formulário
+            key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                // --- CAMPOS DE FORMULÁRIO ---
-                TextFormField(
-                  controller: _nomeController,
-                  decoration: const InputDecoration(labelText: 'Nome Completo', prefixIcon: Icon(Icons.person_outline)),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Por favor, introduza o seu nome.';
-                    }
-                    return null;
-                  },
-                ),
+                _buildHeader(context),
+                const SizedBox(height: 32),
+                ..._buildFormFields(),
+                const SizedBox(height: 32),
+                _buildRegisterButton(),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(labelText: 'E-mail', prefixIcon: Icon(Icons.email_outlined)),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty || !value.contains('@')) {
-                      return 'Por favor, introduza um e-mail válido.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.length < 6) {
-                      return 'A password deve ter pelo menos 6 caracteres.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  decoration: const InputDecoration(labelText: 'Confirmar Password', prefixIcon: Icon(Icons.lock_outline)),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value != _passwordController.text) {
-                      return 'As passwords não coincidem.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _nifController,
-                  decoration: const InputDecoration(labelText: 'NIF de empresa ou NIF pessoal', prefixIcon: Icon(Icons.badge_outlined)),
-                  keyboardType: TextInputType.number,
-                   validator: (value) {
-                    if (value == null || value.length != 9) {
-                      return 'O NIF deve ter 9 dígitos.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _telefoneController,
-                  decoration: const InputDecoration(labelText: 'Nº de Telemóvel', prefixIcon: Icon(Icons.phone_outlined)),
-                  keyboardType: TextInputType.phone,
-                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Por favor, introduza o seu telemóvel.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                
-                // CAMPO DE MORADA COM AUTOCOMPLETE
-                TextFormField(
-                  controller: _moradaController,
-                  focusNode: _moradaFocusNode,
-                  onChanged: _onMoradaChanged,
-                  decoration: const InputDecoration(
-                    labelText: 'Pesquisar Morada', 
-                    prefixIcon: Icon(Icons.home_outlined)
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Por favor, introduza a sua morada.';
-                    }
-                    return null;
-                  },
-                ),
-                // LISTA DE SUGESTÕES
-                if (_isSearching)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16.0),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (_predictions.isNotEmpty)
-                  SizedBox(
-                    height: 200,
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: _predictions.length,
-                      itemBuilder: (context, index) {
-                        final prediction = _predictions[index];
-                        return ListTile(
-                          leading: const Icon(Icons.location_on_outlined),
-                          title: Text(prediction.description ?? ''),
-                          onTap: () => _onPredictionSelected(prediction),
-                        );
-                      },
-                    ),
-                  ),
-
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _codigoPostalController,
-                  decoration: const InputDecoration(labelText: 'Código Postal', prefixIcon: Icon(Icons.local_post_office_outlined)),
-                   validator: (value) {
-                    if (value == null || value.isEmpty) { // Simplificado. Pode ser melhorado com regex.
-                      return 'Por favor, introduza o seu código postal.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-                
-                // --- BOTÃO DE REGISTO ---
-                ElevatedButton(
-                  // Desativamos o botão enquanto estiver a carregar e chamamos o _registerUser
-                  onPressed: _isLoading ? null : _registerUser,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2.0,
-                          ),
-                        )
-                      : const Text('Registar!'),
-                ),
-                const SizedBox(height: 16),
-
-                // --- VOLTAR AO LOGIN ---
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Já tem uma conta? Iniciar Sessão'),
-                ),
-              ],
+                _buildLoginRedirect(context),
+              ].animate(interval: 80.ms).fade(duration: 300.ms).slideY(begin: 0.2),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          'Junte-se à comunidade',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Crie a sua conta para começar a comprar ou vender produtos locais frescos.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _buildFormFields() {
+    return [
+      TextFormField(
+        controller: _nomeController,
+        decoration: const InputDecoration(labelText: 'Nome Completo', prefixIcon: Icon(Icons.person_outline)),
+        validator: (value) => (value == null || value.isEmpty) ? 'O nome é obrigatório.' : null,
+      ),
+      const SizedBox(height: 16),
+      TextFormField(
+        controller: _emailController,
+        decoration: const InputDecoration(labelText: 'E-mail', prefixIcon: Icon(Icons.email_outlined)),
+        keyboardType: TextInputType.emailAddress,
+        validator: (value) => (value == null || !value.contains('@')) ? 'Insira um e-mail válido.' : null,
+      ),
+      const SizedBox(height: 16),
+      TextFormField(
+        controller: _passwordController,
+        decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)),
+        obscureText: true,
+        validator: (value) => (value == null || value.length < 6) ? 'A password deve ter pelo menos 6 caracteres.' : null,
+      ),
+      const SizedBox(height: 16),
+      TextFormField(
+        controller: _confirmPasswordController,
+        decoration: const InputDecoration(labelText: 'Confirmar Password', prefixIcon: Icon(Icons.lock_person_outlined)),
+        obscureText: true,
+        validator: (value) => (value != _passwordController.text) ? 'As passwords não coincidem.' : null,
+      ),
+      const SizedBox(height: 24),
+      const Divider(),
+      const SizedBox(height: 16),
+      TextFormField(
+        controller: _nifController,
+        decoration: const InputDecoration(labelText: 'NIF (Opcional)', prefixIcon: Icon(Icons.badge_outlined)),
+        keyboardType: TextInputType.number,
+      ),
+      const SizedBox(height: 16),
+      TextFormField(
+        controller: _telefoneController,
+        decoration: const InputDecoration(labelText: 'Telefone (Opcional)', prefixIcon: Icon(Icons.phone_outlined)),
+        keyboardType: TextInputType.phone,
+      ),
+      const SizedBox(height: 16),
+      _buildAddressSearch(),
+    ];
+  }
+
+  Widget _buildAddressSearch() {
+    return Column(
+      children: [
+        TextFormField(
+          controller: _moradaController,
+          focusNode: _moradaFocusNode,
+          onChanged: _onMoradaChanged,
+          decoration: InputDecoration(
+            labelText: 'Morada',
+            prefixIcon: const Icon(Icons.location_on_outlined),
+            suffixIcon: _isSearching ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : null,
+          ),
+          validator: (value) => (value == null || value.isEmpty) ? 'A morada é obrigatória.' : null,
+        ),
+        if (_predictions.isNotEmpty)
+          SizedBox(
+            height: 200, // Altura fixa para a lista de sugestões
+            child: ListView.builder(
+              itemCount: _predictions.length,
+              itemBuilder: (context, index) {
+                final prediction = _predictions[index];
+                return ListTile(
+                  title: Text(prediction.description ?? ''),
+                  onTap: () => _onPredictionSelected(prediction),
+                );
+              },
+            ),
+          ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _codigoPostalController,
+          decoration: const InputDecoration(labelText: 'Código Postal', prefixIcon: Icon(Icons.local_post_office_outlined)),
+          validator: (value) => (value == null || value.isEmpty) ? 'O código postal é obrigatório.' : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRegisterButton() {
+    return ElevatedButton(
+      onPressed: _isLoading ? null : _registerUser,
+      style: ElevatedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+      ),
+      child: _isLoading
+          ? const SizedBox(
+              height: 24,
+              width: 24,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+            )
+          : const Text('Criar Conta'),
+    );
+  }
+
+  Widget _buildLoginRedirect(BuildContext context) {
+    return TextButton(
+      onPressed: () => Navigator.of(context).pop(),
+      child: RichText(
+        textAlign: TextAlign.center,
+        text: TextSpan(
+          text: 'Já tem uma conta? ',
+          style: Theme.of(context).textTheme.bodyMedium,
+          children: [
+            TextSpan(
+              text: 'Iniciar Sessão',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ],
         ),
       ),
     );

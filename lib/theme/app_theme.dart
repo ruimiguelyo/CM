@@ -3,83 +3,127 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // Nova paleta de cores com #2A815E como cor principal
+  // Paleta de cores refinada para um look mais limpo e moderno
   static const Color primaryColor = Color(0xFF2A815E); // Verde escuro principal
-  static const Color primaryLightColor = Color(0xFF4CAF50); // Verde mais claro para variações
-  static const Color accentColor = Color(0xFFFF9800); // Laranja para detalhes/ações
-  static const Color backgroundColor = Color(0xFFFAFAFA); // Fundo muito claro
-  static const Color surfaceColor = Color(0xFFFFFFFF); // Branco para cards
-  static const Color textColor = Color(0xFF2E2E2E); // Texto escuro
-  static const Color textSecondaryColor = Color(0xFF6B6B6B); // Texto secundário
+  static const Color accentColor = Color(0xFFFFA000); // Laranja para ênfase
+  static const Color backgroundColor = Color(0xFFF5F5F5); // Fundo cinza muito claro
+  static const Color surfaceColor = Color(0xFFFFFFFF); // Branco puro para superfícies
+  static const Color textColor = Color(0xFF1F1F1F); // Texto escuro para legibilidade
+  static const Color textSecondaryColor = Color(0xFF5F5F5F); // Texto secundário mais suave
 
   static ThemeData get lightTheme {
+    final textTheme = GoogleFonts.interTextTheme(
+      ThemeData.light().textTheme,
+    ).apply(
+      bodyColor: textColor,
+      displayColor: textColor,
+    );
+
     return ThemeData(
       primaryColor: primaryColor,
       scaffoldBackgroundColor: backgroundColor,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryColor,
+        primary: primaryColor,
         secondary: accentColor,
-        surface: backgroundColor,
+        surface: surfaceColor,
+        background: backgroundColor,
         brightness: Brightness.light,
+        onPrimary: Colors.white,
+        onSecondary: Colors.black,
+        onSurface: textColor,
+        onBackground: textColor,
       ),
-      textTheme: GoogleFonts.latoTextTheme().apply(
-        bodyColor: textColor,
-        displayColor: textColor,
-      ),
+      textTheme: textTheme,
       appBarTheme: AppBarTheme(
-        backgroundColor: primaryColor,
+        backgroundColor: surfaceColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        titleTextStyle: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
+        iconTheme: const IconThemeData(color: textColor),
+        titleTextStyle: textTheme.headlineSmall?.copyWith(
+          color: textColor,
           fontWeight: FontWeight.bold,
         ),
-        systemOverlayStyle: SystemUiOverlayStyle.light,
+        systemOverlayStyle: SystemUiOverlayStyle.dark.copyWith(
+          statusBarColor: Colors.transparent,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: surfaceColor,
+        elevation: 0,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.grey.shade200, width: 1),
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          elevation: 0.5,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.bold,
           ),
-          elevation: 2,
         ),
       ),
-      cardTheme: CardThemeData(
-        color: surfaceColor,
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: primaryColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          side: BorderSide(color: Colors.grey.shade300, width: 1.5),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          textStyle: textTheme.labelLarge,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: primaryColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          textStyle: textTheme.labelLarge,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surfaceColor,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: Colors.grey.shade300),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: Colors.grey.shade300),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: primaryColor, width: 2),
         ),
-        labelStyle: TextStyle(color: textSecondaryColor),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        labelStyle: textTheme.bodyLarge?.copyWith(color: textSecondaryColor),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
+        elevation: 1,
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: primaryColor.withOpacity(0.1),
+        labelStyle: textTheme.bodySmall?.copyWith(color: primaryColor),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        side: BorderSide.none,
+      ),
+      iconTheme: const IconThemeData(
+        color: textSecondaryColor,
+        size: 22,
       ),
     );
   }

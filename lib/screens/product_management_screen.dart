@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:hellofarmer_app/models/product_model.dart';
 import 'package:hellofarmer_app/screens/add_edit_product_screen.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
@@ -19,6 +20,9 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gestão de Produtos'),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
+        elevation: 0,
       ),
       body: StreamBuilder<List<ProductModel>>(
         stream: _firestoreService.getProdutos(widget.userId),
@@ -30,69 +34,126 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
             return Center(child: Text('Ocorreu um erro: ${snapshot.error}'));
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text(
-                  'Ainda não tem produtos adicionados.\nClique no botão "+" para começar a vender!',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16),
-                ),
-              ),
-            );
+            return _buildEmptyState(context);
           }
 
           final produtos = snapshot.data!;
 
-          return ListView.builder(
+          return GridView.builder(
+            padding: const EdgeInsets.all(16),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 0.8,
+            ),
             itemCount: produtos.length,
             itemBuilder: (context, index) {
               final produto = produtos[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  leading: const Icon(Icons.shopping_basket_outlined, size: 40),
-                  title: Text(produto.nome, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('${produto.preco.toStringAsFixed(2)} € / ${produto.unidade}'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        tooltip: 'Editar Produto',
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => AddEditProductScreen(
-                                userId: widget.userId,
-                                product: produto,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
-                        tooltip: 'Remover Produto',
-                        onPressed: () => _showDeleteConfirmationDialog(produto),
-                      ),
-                    ],
-                  ),
-                ),
-              );
+              return _buildProductCard(context, produto)
+                  .animate()
+                  .fade(delay: (100 * index).ms, duration: 400.ms)
+                  .scale(begin: const Offset(0.9, 0.9));
             },
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => AddEditProductScreen(userId: widget.userId),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => AddEditProductScreen(userId: widget.userId)),
+        ),
+        label: const Text('Adicionar'),
+        icon: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey),
+          const SizedBox(height: 24),
+          Text(
+            'Sem produtos na sua banca',
+            style: Theme.of(context).textTheme.headlineSmall,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Adicione produtos para começar a vender.',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ).animate().fade(duration: 500.ms);
+  }
+
+  Widget _buildProductCard(BuildContext context, ProductModel produto) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: Colors.grey.shade200, width: 1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => AddEditProductScreen(userId: widget.userId, product: produto)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Container(
+                color: Colors.grey.shade100,
+                child: produto.imagemUrl.isNotEmpty
+                    ? Image.network(produto.imagemUrl, fit: BoxFit.cover)
+                    : const Icon(Icons.agriculture_outlined, size: 40, color: Colors.grey),
+              ),
             ),
-          );
-        },
-        child: const Icon(Icons.add),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(produto.nome, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  Text(
+                    '€${produto.preco.toStringAsFixed(2)} / ${produto.unidade}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).primaryColor),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Stock: ${produto.stock.toStringAsFixed(0)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ),
+            // Adicionar uma linha de botões para ações rápidas
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 20),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => AddEditProductScreen(userId: widget.userId, product: produto)),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
+                    onPressed: () => _showDeleteConfirmationDialog(produto),
+                  ),
+                ],
+              ),
+            )
+          ],
+        ),
       ),
     );
   }

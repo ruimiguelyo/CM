@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_maps_apis/places.dart';
 import 'package:hellofarmer_app/models/order_model.dart';
 import 'package:hellofarmer_app/providers/cart_provider.dart';
@@ -183,88 +184,185 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final cart = Provider.of<CartProvider>(context, listen: false);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Finalizar Compra')),
+      appBar: AppBar(
+        title: const Text('Finalizar Compra'),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
+        elevation: 0,
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Morada de Entrega', style: Theme.of(context).textTheme.headlineSmall),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              _buildSectionHeader(context, '1', 'Endereço de Entrega'),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _moradaController,
-                focusNode: _moradaFocusNode,
-                onChanged: _onMoradaChanged,
-                decoration: const InputDecoration(labelText: 'Pesquisar Morada'),
-                validator: (value) =>
-                    value!.isEmpty ? 'Por favor, insira a morada.' : null,
-              ),
-              if (_isSearching)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16.0),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_predictions.isNotEmpty)
-                SizedBox(
-                  height: 200,
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: _predictions.length,
-                    itemBuilder: (context, index) {
-                      final prediction = _predictions[index];
-                      return ListTile(
-                        leading: const Icon(Icons.location_on_outlined),
-                        title: Text(prediction.description ?? ''),
-                        onTap: () => _onPredictionSelected(prediction),
-                      );
-                    },
-                  ),
-                ),
-              const SizedBox(height: 8),
+              _buildAddressSearch(),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _codigoPostalController,
-                decoration: const InputDecoration(labelText: 'Código Postal'),
-                validator: (value) => value!.isEmpty
-                    ? 'Por favor, insira o código postal.'
-                    : null,
+                decoration: const InputDecoration(labelText: 'Código Postal', prefixIcon: Icon(Icons.local_post_office_outlined)),
+                validator: (value) => value!.isEmpty ? 'Insira o código postal.' : null,
               ),
               const SizedBox(height: 32),
-              Text('Resumo do Pedido',
-                  style: Theme.of(context).textTheme.headlineSmall),
+              _buildSectionHeader(context, '2', 'Resumo do Pedido'),
               const SizedBox(height: 16),
-              ...cart.items.values.map((item) => ListTile(
-                title: Text(item.product.nome),
-                subtitle: Text('x${item.quantity}'),
-                trailing: Text('€${(item.product.preco * item.quantity).toStringAsFixed(2)}'),
-              )),
-              const Divider(),
-              ListTile(
-                title: Text('Total', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                trailing: Text('€${cart.totalAmount.toStringAsFixed(2)}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-              ),
+              _buildOrderSummary(context, cart),
               const SizedBox(height: 32),
-              Text('Método de Pagamento', style: Theme.of(context).textTheme.headlineSmall),
+              _buildSectionHeader(context, '3', 'Método de Pagamento'),
               const SizedBox(height: 16),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.credit_card),
-                  title: const Text('MBWay (simulação)'),
-                  subtitle: const Text('O pagamento será simulado.'),
-                ),
-              ),
-              const SizedBox(height: 32),
-              if (_isLoading)
-                const Center(child: CircularProgressIndicator())
-              else
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
-                  onPressed: () => _placeOrder(cart),
-                  child: const Text('Confirmar e Pagar', style: TextStyle(fontSize: 18)),
-                ),
-            ],
+              _buildPaymentMethod(context),
+            ].animate(interval: 80.ms).fade(duration: 400.ms).slideY(begin: 0.1),
           ),
+        ),
+      ),
+      bottomNavigationBar: _buildBottomBar(context, cart),
+    );
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String number, String title) {
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 14,
+          backgroundColor: Theme.of(context).primaryColor,
+          child: Text(number, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(width: 12),
+        Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildAddressSearch() {
+    return Column(
+      children: [
+        TextFormField(
+          controller: _moradaController,
+          focusNode: _moradaFocusNode,
+          onChanged: _onMoradaChanged,
+          decoration: InputDecoration(
+            labelText: 'Pesquisar Morada',
+            prefixIcon: const Icon(Icons.location_on_outlined),
+            suffixIcon: _isSearching ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : null,
+          ),
+          validator: (value) => value!.isEmpty ? 'Insira a morada.' : null,
+        ),
+        if (_predictions.isNotEmpty)
+          Container(
+            height: 200,
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 5,
+                ),
+              ],
+            ),
+            child: ListView.builder(
+              itemCount: _predictions.length,
+              itemBuilder: (context, index) {
+                final prediction = _predictions[index];
+                return ListTile(
+                  leading: const Icon(Icons.location_city_outlined),
+                  title: Text(prediction.description ?? ''),
+                  onTap: () => _onPredictionSelected(prediction),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildOrderSummary(BuildContext context, CartProvider cart) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: Colors.grey.shade200, width: 1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          ...cart.items.values.map((item) {
+            return ListTile(
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Image.network(item.product.imagemUrl, width: 40, height: 40, fit: BoxFit.cover),
+              ),
+              title: Text(item.product.nome),
+              subtitle: Text('x${item.quantity}'),
+              trailing: Text('€${(item.product.preco * item.quantity).toStringAsFixed(2)}'),
+            );
+          }),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Total', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  '€${cart.totalAmount.toStringAsFixed(2)}',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethod(BuildContext context) {
+    // Por agora, um placeholder. No futuro, isto pode ser expandido.
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: Colors.grey.shade200, width: 1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const ListTile(
+        leading: Icon(Icons.delivery_dining_outlined),
+        title: Text('Pagamento na Entrega'),
+        subtitle: Text('O pagamento será efetuado no momento da entrega.'),
+      ),
+    );
+  }
+
+  Widget _buildBottomBar(BuildContext context, CartProvider cart) {
+    return Container(
+      padding: const EdgeInsets.all(16).copyWith(bottom: 16 + MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+        border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
+      ),
+      child: ElevatedButton.icon(
+        icon: _isLoading ? const SizedBox.shrink() : const Icon(Icons.check_circle_outline_rounded),
+        label: _isLoading
+            ? const SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+              )
+            : const Text('Confirmar Encomenda'),
+        onPressed: _isLoading ? null : () => _placeOrder(cart),
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
         ),
       ),
     );

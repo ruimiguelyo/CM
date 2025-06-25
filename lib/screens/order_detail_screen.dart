@@ -19,14 +19,28 @@ class OrderDetailScreen extends StatefulWidget {
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final LocationService _locationService = LocationService();
+  final FirestoreService _firestoreService = FirestoreService();
   GoogleMapController? _mapController;
   Set<Marker> _markers = {};
   LatLng? _deliveryLocation;
+  Future<UserModel?>? _producerFuture;
 
   @override
   void initState() {
     super.initState();
     _initializeDeliveryLocation();
+    _loadProducerInfo();
+  }
+
+  void _loadProducerInfo() {
+    // Assumindo que a encomenda tem pelo menos um produtor.
+    // Numa app real, seria bom ter uma lógica mais robusta se 'producerIds' puder estar vazio.
+    if (widget.order.producerIds.isNotEmpty) {
+      final producerId = widget.order.producerIds.first;
+      setState(() {
+        _producerFuture = _firestoreService.getUser(producerId).first;
+      });
+    }
   }
 
   void _initializeDeliveryLocation() async {
@@ -73,6 +87,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             // Cabeçalho
             Text('Encomenda #${widget.order.id!.substring(0, 8)}', style: Theme.of(context).textTheme.headlineSmall),
             Text(DateFormat('d MMMM y, HH:mm').format(widget.order.orderDate.toDate())),
+            const SizedBox(height: 16),
+
+            // Informação do Produtor
+            _buildProducerInfo(context),
             const SizedBox(height: 24),
             
             // Itens da Encomenda
@@ -107,6 +125,65 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildProducerInfo(BuildContext context) {
+    // Se não há futuro (nenhum ID de produtor), não mostra nada.
+    if (_producerFuture == null) {
+      return const SizedBox.shrink();
+    }
+
+    return FutureBuilder<UserModel?>(
+      future: _producerFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('A carregar dados do produtor...'),
+                ],
+              ),
+            ),
+          );
+        }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+          return const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('Não foi possível carregar a informação do produtor.'),
+            ),
+          );
+        }
+
+        final producer = snapshot.data!;
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Vendido por', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.storefront, color: Colors.grey),
+                    const SizedBox(width: 12),
+                    Text(
+                      producer.nome,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
