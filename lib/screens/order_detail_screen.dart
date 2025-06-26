@@ -4,7 +4,8 @@ import 'package:hellofarmer_app/models/order_model.dart';
 import 'package:hellofarmer_app/models/user_model.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
 import 'package:intl/intl.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'package:hellofarmer_app/services/location_service.dart';
 // Adicionar o ecrã de avaliação que será criado a seguir
 import 'package:hellofarmer_app/screens/evaluation_screen.dart';
@@ -20,9 +21,9 @@ class OrderDetailScreen extends StatefulWidget {
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final LocationService _locationService = LocationService();
   final FirestoreService _firestoreService = FirestoreService();
-  GoogleMapController? _mapController;
-  Set<Marker> _markers = {};
-  LatLng? _deliveryLocation;
+  final MapController _mapController = MapController();
+  List<Marker> _markers = [];
+  latlong.LatLng? _deliveryLocation;
   Future<UserModel?>? _producerFuture;
 
   @override
@@ -47,25 +48,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     try {
       // Usa as coordenadas de entrega guardadas na encomenda
       if (widget.order.deliveryLatitude != null && widget.order.deliveryLongitude != null) {
-        _deliveryLocation = LatLng(widget.order.deliveryLatitude!, widget.order.deliveryLongitude!);
+        _deliveryLocation = latlong.LatLng(widget.order.deliveryLatitude!, widget.order.deliveryLongitude!);
       } else {
         // Fallback para uma localização padrão se não houver coordenadas
-        _deliveryLocation = const LatLng(39.5, -8.0); 
+        _deliveryLocation = latlong.LatLng(39.5, -8.0); 
       }
       
       if (mounted) {
         setState(() {
-          _markers = {
+          _markers = [
             Marker(
-              markerId: const MarkerId('delivery'),
-              position: _deliveryLocation!,
-              infoWindow: InfoWindow(
-                title: 'Local de Entrega',
-                snippet: widget.order.shippingAddress['morada'],
-              ),
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+              width: 80.0,
+              height: 80.0,
+              point: _deliveryLocation!,
+              child: const Icon(Icons.location_pin, color: Colors.blue, size: 40),
             ),
-          };
+          ];
         });
       }
     } catch (e) {
@@ -261,19 +259,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Widget _buildMapWidget() {
     try {
-      return GoogleMap(
-        onMapCreated: (GoogleMapController controller) {
-          _mapController = controller;
-        },
-        initialCameraPosition: CameraPosition(
-          target: _deliveryLocation!,
-          zoom: 13.0,
+      return FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: _deliveryLocation!,
+          initialZoom: 14.0,
         ),
-        markers: _markers,
-        zoomControlsEnabled: true,
-        compassEnabled: true,
-        myLocationButtonEnabled: false,
-        mapType: MapType.normal,
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.example.hellofarmer_app',
+          ),
+          MarkerLayer(markers: _markers),
+        ],
       );
     } catch (e) {
       // Fallback se o Google Maps não estiver disponível

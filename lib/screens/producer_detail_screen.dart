@@ -7,7 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:hellofarmer_app/models/order_model.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'package:hellofarmer_app/screens/product_detail_screen.dart';
 
 class ProducerDetailScreen extends StatefulWidget {
@@ -19,29 +20,27 @@ class ProducerDetailScreen extends StatefulWidget {
 }
 
 class _ProducerDetailScreenState extends State<ProducerDetailScreen> {
-  GoogleMapController? _mapController;
-  Set<Marker> _markers = {};
-
-  void _onMapCreated(GoogleMapController controller) {
-    _mapController = controller;
-  }
+  final MapController _mapController = MapController();
+  List<Marker> _markers = [];
 
   void _updateMapMarker(UserModel producer) {
     if (producer.latitude != null && producer.longitude != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() {
-            _markers = {
+            _markers = [
               Marker(
-                markerId: MarkerId('producer_${producer.uid}'),
-                position: LatLng(producer.latitude!, producer.longitude!),
-                infoWindow: InfoWindow(
-                  title: producer.nome,
-                  snippet: producer.morada,
-                ),
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                width: 80.0,
+                height: 80.0,
+                point: latlong.LatLng(producer.latitude!, producer.longitude!),
+                child: Column(
+                  children: [
+                    Icon(Icons.location_pin, color: Theme.of(context).primaryColor, size: 40),
+                    Text(producer.nome, style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, backgroundColor: Colors.white.withOpacity(0.7))),
+                  ],
+                )
               ),
-            };
+            ];
           });
         }
       });
@@ -169,17 +168,19 @@ class _ProducerDetailScreenState extends State<ProducerDetailScreen> {
 
   Widget _buildMapWidget(UserModel producer) {
     try {
-      return GoogleMap(
-        onMapCreated: _onMapCreated,
-        initialCameraPosition: CameraPosition(
-          target: LatLng(producer.latitude!, producer.longitude!),
-          zoom: 14.0,
+      return FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: latlong.LatLng(producer.latitude!, producer.longitude!),
+          initialZoom: 14.0,
         ),
-        markers: _markers,
-        zoomControlsEnabled: false,
-        myLocationButtonEnabled: false,
-        compassEnabled: true,
-        mapType: MapType.normal,
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.example.hellofarmer_app',
+          ),
+          MarkerLayer(markers: _markers),
+        ],
       );
     } catch (e) {
       // Fallback se o Google Maps não estiver disponível

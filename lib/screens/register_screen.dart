@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_maps_apis/places.dart';
 import 'package:hellofarmer_app/theme/app_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -17,10 +16,8 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  // Chave para identificar e validar o nosso formulário
   final _formKey = GlobalKey<FormState>();
 
-  // Controladores para obter o texto dos campos
   final _nomeController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -30,33 +27,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _moradaController = TextEditingController();
   final _codigoPostalController = TextEditingController();
 
-  // Instância do nosso repositório de autenticação
   final AuthRepository _authRepository = AuthRepository();
-  // Instância do serviço de localização
   final LocationService _locationService = LocationService();
 
-  // Variáveis para a pesquisa de moradas
   Timer? _debounce;
-  List<Prediction> _predictions = [];
+  List<AddressSuggestion> _predictions = [];
   bool _isSearching = false;
-  String? _sessionToken;
   final FocusNode _moradaFocusNode = FocusNode();
 
-  // Estado para controlar o loading
   bool _isLoading = false;
 
-  // Novas variáveis para guardar as coordenadas
   double? _latitude;
   double? _longitude;
 
   @override
   void initState() {
     super.initState();
-    // Gerar um token de sessão quando o ecrã é iniciado
-    _sessionToken = _locationService.generateSessionToken();
     _moradaFocusNode.addListener(() {
       if (!_moradaFocusNode.hasFocus) {
-        // Se o campo de morada perde o foco, limpa as sugestões
         setState(() {
           _predictions = [];
         });
@@ -64,7 +52,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
   }
 
-  // É importante limpar os controladores quando o widget é removido da árvore.
   @override
   void dispose() {
     _debounce?.cancel();
@@ -80,7 +67,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  /// Pesquisa a morada com um debounce para evitar chamadas excessivas à API
   void _onMoradaChanged(String input) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () async {
@@ -89,7 +75,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _isSearching = true;
           _predictions = [];
         });
-        final result = await _locationService.searchPlaces(input, sessionToken: _sessionToken!);
+        final result = await _locationService.searchPlaces(input);
         if (mounted) {
           setState(() {
             _predictions = result;
@@ -107,84 +93,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
   }
 
-  /// Chamado quando uma sugestão de morada é selecionada
-  Future<void> _onPredictionSelected(Prediction prediction) async {
-    // Esconder o teclado e limpar sugestões
+  void _onPredictionSelected(AddressSuggestion prediction) async {
     FocusScope.of(context).unfocus();
     
-    // Mostra loading enquanto busca detalhes
     setState(() {
-      _moradaController.text = prediction.description ?? '';
-      _predictions = []; 
-      _isSearching = true;
+      _moradaController.text = prediction.description;
+      _latitude = prediction.latitude;
+      _longitude = prediction.longitude;
+      _predictions = [];
+      _isSearching = false;
     });
 
-    final details = await _locationService.getPlaceDetails(prediction.placeId!, sessionToken: _sessionToken!);
-
-    if (details != null && mounted) {
-      // Extrair componentes da morada
-      String streetName = '';
-      String streetNumber = '';
-      String postalCode = '';
-      String city = '';
-
-      if (details.addressComponents != null) {
-        for (var component in details.addressComponents!) {
-          if (component.types?.contains('route') ?? false) {
-            streetName = component.longName ?? '';
-          }
-          if (component.types?.contains('street_number') ?? false) {
-            streetNumber = component.longName ?? '';
-          }
-          if (component.types?.contains('postal_code') ?? false) {
-            postalCode = component.longName ?? '';
-          }
-          if (component.types?.contains('postal_town') ?? false || (component.types?.contains('locality') ?? false)) {
-            city = component.longName ?? '';
-          }
-        }
+    final placemark = await _locationService.getAddressFromCoordinates(prediction.latitude, prediction.longitude);
+    if (placemark != null && placemark.postalCode != null) {
+      if (mounted) {
+        setState(() {
+          _codigoPostalController.text = placemark.postalCode!;
+        });
       }
-
-      setState(() {
-        _moradaController.text = '$streetName, $streetNumber'.trim().replaceAll(RegExp(r',$'), '');
-        _codigoPostalController.text = postalCode;
-        _latitude = details.geometry?.location.lat;
-        _longitude = details.geometry?.location.lng;
-        _isSearching = false;
-      });
-    } else if (mounted) {
-      setState(() => _isSearching = false);
-      _showErrorSnackBar('Não foi possível obter os detalhes da morada.');
     }
-
-    // Gerar um novo token de sessão para a próxima pesquisa
-    _sessionToken = _locationService.generateSessionToken();
   }
 
-
-  // Método principal para o registo do utilizador
   Future<void> _registerUser() async {
-    // Primeiro, validamos o formulário
     if (!_formKey.currentState!.validate()) {
-      return; // Se não for válido, não fazemos nada.
+      return;
     }
 
-    // Ativamos o estado de loading para dar feedback visual
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // 1. Criar utilizador no Firebase Authentication
       UserCredential userCredential =
           await _authRepository.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // 2. Se a criação for bem-sucedida, guardar dados no Firestore
       if (userCredential.user != null) {
-        // Criar uma instância do nosso UserModel com os dados dos controladores
         UserModel newUser = UserModel(
           uid: userCredential.user!.uid,
           nome: _nomeController.text.trim(),
@@ -197,24 +143,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
           longitude: _longitude,
         );
 
-        // Guardar o objeto UserModel (convertido para Map) no Firestore
         await FirebaseFirestore.instance
             .collection('users')
             .doc(newUser.uid)
             .set(newUser.toMap());
         
-        // **NOVA LÓGICA**: Forçar logout e voltar ao login
-        // Fazemos logout para que o AuthGate não navegue automaticamente.
         await _authRepository.signOut();
         
-        // Se o widget ainda estiver montado, mostramos feedback e voltamos.
         if (mounted) {
           _showSuccessSnackBar('Registo concluído! Por favor, inicie sessão.');
-          Navigator.of(context).pop(); // Volta para o ecrã de login
+          Navigator.of(context).pop();
         }
       }
     } on FirebaseAuthException catch (e) {
-      // Tratar erros específicos do Firebase Auth
       String errorMessage = 'Ocorreu um erro durante o registo.';
       if (e.code == 'weak-password') {
         errorMessage = 'A password é demasiado fraca.';
@@ -223,10 +164,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
       _showErrorSnackBar(errorMessage);
     } catch (e) {
-      // Tratar outros erros genéricos
       _showErrorSnackBar('Ocorreu um erro inesperado. Tente novamente.');
     } finally {
-      // Desativar o estado de loading, quer o processo tenha sucesso ou falhe.
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -235,7 +174,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  // Widget auxiliar para mostrar feedback de erro
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -245,7 +183,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Widget auxiliar para mostrar feedback de sucesso
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -308,52 +245,81 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   List<Widget> _buildFormFields() {
     return [
+      _buildAddressSearchField(),
+      const SizedBox(height: 16),
+      TextFormField(
+        controller: _codigoPostalController,
+        decoration: const InputDecoration(labelText: 'Código Postal'),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Por favor, introduza o seu código postal.';
+          }
+          return null;
+        },
+      ),
+      const SizedBox(height: 16),
       TextFormField(
         controller: _nomeController,
-        decoration: const InputDecoration(labelText: 'Nome Completo', prefixIcon: Icon(Icons.person_outline)),
-        validator: (value) => (value == null || value.isEmpty) ? 'O nome é obrigatório.' : null,
+        decoration: const InputDecoration(labelText: 'Nome Completo'),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Por favor, introduza o seu nome.';
+          }
+          return null;
+        },
       ),
-      const SizedBox(height: 16),
-      TextFormField(
-        controller: _emailController,
-        decoration: const InputDecoration(labelText: 'E-mail', prefixIcon: Icon(Icons.email_outlined)),
-        keyboardType: TextInputType.emailAddress,
-        validator: (value) => (value == null || !value.contains('@')) ? 'Insira um e-mail válido.' : null,
-      ),
-      const SizedBox(height: 16),
-      TextFormField(
-        controller: _passwordController,
-        decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)),
-        obscureText: true,
-        validator: (value) => (value == null || value.length < 6) ? 'A password deve ter pelo menos 6 caracteres.' : null,
-      ),
-      const SizedBox(height: 16),
-      TextFormField(
-        controller: _confirmPasswordController,
-        decoration: const InputDecoration(labelText: 'Confirmar Password', prefixIcon: Icon(Icons.lock_person_outlined)),
-        obscureText: true,
-        validator: (value) => (value != _passwordController.text) ? 'As passwords não coincidem.' : null,
-      ),
-      const SizedBox(height: 24),
-      const Divider(),
       const SizedBox(height: 16),
       TextFormField(
         controller: _nifController,
-        decoration: const InputDecoration(labelText: 'NIF (Opcional)', prefixIcon: Icon(Icons.badge_outlined)),
+        decoration: const InputDecoration(labelText: 'NIF'),
         keyboardType: TextInputType.number,
       ),
       const SizedBox(height: 16),
       TextFormField(
         controller: _telefoneController,
-        decoration: const InputDecoration(labelText: 'Telefone (Opcional)', prefixIcon: Icon(Icons.phone_outlined)),
+        decoration: const InputDecoration(labelText: 'Telefone'),
         keyboardType: TextInputType.phone,
       ),
       const SizedBox(height: 16),
-      _buildAddressSearch(),
+      TextFormField(
+        controller: _emailController,
+        decoration: const InputDecoration(labelText: 'E-mail'),
+        keyboardType: TextInputType.emailAddress,
+        validator: (value) {
+          if (value == null || !value.contains('@')) {
+            return 'Por favor, introduza um e-mail válido.';
+          }
+          return null;
+        },
+      ),
+      const SizedBox(height: 16),
+      TextFormField(
+        controller: _passwordController,
+        decoration: const InputDecoration(labelText: 'Password'),
+        obscureText: true,
+        validator: (value) {
+          if (value == null || value.length < 6) {
+            return 'A password deve ter pelo menos 6 caracteres.';
+          }
+          return null;
+        },
+      ),
+      const SizedBox(height: 16),
+      TextFormField(
+        controller: _confirmPasswordController,
+        decoration: const InputDecoration(labelText: 'Confirmar Password'),
+        obscureText: true,
+        validator: (value) {
+          if (value != _passwordController.text) {
+            return 'As passwords não coincidem.';
+          }
+          return null;
+        },
+      ),
     ];
   }
 
-  Widget _buildAddressSearch() {
+  Widget _buildAddressSearchField() {
     return Column(
       children: [
         TextFormField(
@@ -361,32 +327,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
           focusNode: _moradaFocusNode,
           onChanged: _onMoradaChanged,
           decoration: InputDecoration(
-            labelText: 'Morada',
+            labelText: 'Pesquisar Morada',
             prefixIcon: const Icon(Icons.location_on_outlined),
             suffixIcon: _isSearching ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : null,
           ),
-          validator: (value) => (value == null || value.isEmpty) ? 'A morada é obrigatória.' : null,
+          validator: (value) => value!.isEmpty ? 'Insira a morada.' : null,
         ),
         if (_predictions.isNotEmpty)
-          SizedBox(
-            height: 200, // Altura fixa para a lista de sugestões
+          Container(
+            height: 200,
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300)
+            ),
             child: ListView.builder(
               itemCount: _predictions.length,
               itemBuilder: (context, index) {
                 final prediction = _predictions[index];
                 return ListTile(
-                  title: Text(prediction.description ?? ''),
+                  title: Text(prediction.description),
                   onTap: () => _onPredictionSelected(prediction),
                 );
               },
             ),
           ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _codigoPostalController,
-          decoration: const InputDecoration(labelText: 'Código Postal', prefixIcon: Icon(Icons.local_post_office_outlined)),
-          validator: (value) => (value == null || value.isEmpty) ? 'O código postal é obrigatório.' : null,
-        ),
       ],
     );
   }

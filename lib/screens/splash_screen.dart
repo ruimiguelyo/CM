@@ -31,7 +31,11 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.agriculture, color: Colors.white, size: 100),
+            Image.asset(
+              'assets/logo.png',
+              width: 120,
+              height: 120,
+            ),
             const SizedBox(height: 20),
             Text(
               'HelloFarmer',

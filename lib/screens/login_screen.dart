@@ -108,10 +108,10 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildHeader(BuildContext context) {
     return Column(
       children: [
-        Icon(
-          Icons.agriculture_rounded,
-          color: Theme.of(context).colorScheme.primary,
-          size: 60,
+        Image.asset(
+          'assets/logo.png',
+          width: 80,
+          height: 80,
         ),
         const SizedBox(height: 16),
         Text(

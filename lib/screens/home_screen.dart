@@ -13,7 +13,8 @@ import 'package:hellofarmer_app/screens/sensors_demo_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:hellofarmer_app/widgets/custom_badge.dart';
 import 'package:hellofarmer_app/screens/favorites_screen.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'package:hellofarmer_app/services/location_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -30,20 +31,17 @@ class _HomeScreenState extends State<HomeScreen> {
   final FirestoreService _firestoreService = FirestoreService();
   final LocationService _locationService = LocationService();
   
-  // Controller para o mapa
-  final Completer<GoogleMapController> _mapController = Completer();
+  // Controller para o flutter_map
+  final MapController _mapController = MapController();
 
-  // O Set<Marker> é a única coisa que precisa ser um estado para o mapa
-  Set<Marker> _markers = {};
+  // A lista de marcadores para o flutter_map
+  List<Marker> _markers = [];
 
   Position? _currentPosition;
   
   // Coordenadas padrão (centro de Portugal)
-  static const CameraPosition _defaultCameraPosition = CameraPosition(
-    target: LatLng(39.5, -8.0),
-    zoom: 7,
-  );
-
+  static final latlong.LatLng _defaultLocation = latlong.LatLng(39.5, -8.0);
+  
   bool _isMapView = false;
   List<UserModel> _producers = [];
   List<UserModel> _filteredProducers = [];
@@ -62,13 +60,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    // Carregamos tudo em paralelo para um arranque mais rápido
-    await Future.wait([
-      _initializeLocationAndMoveCamera(),
-      _loadProducersAndApplyFilters(), // Combina o carregamento e o filtro inicial
-      _loadCategories(),
+    // Carrega dados que não dependem da localização primeiro.
+    // O await aqui garante que temos categorias e o utilizador carregado antes de fazer o primeiro render.
+    // A lista de produtores também começa a ser carregada em paralelo.
+    Future.wait([
       _loadCurrentUser(),
+      _loadCategories(),
+      _updateProducersList(), // Carrega a lista inicial, que pode ser re-filtrada depois.
     ]);
+
+    // Agora, tenta obter a localização em segundo plano.
+    // Se for bem-sucedido, a lista será atualizada para refletir a distância.
+    _initializeLocationAndMoveCamera().then((locationFound) {
+      if (locationFound && mounted) {
+        // A localização foi encontrada, disparamos uma nova atualização da lista para aplicar o filtro de distância.
+        _updateProducersList();
+      }
+    });
   }
 
   // NOVO: Carrega os dados do utilizador atual uma vez
@@ -85,23 +93,68 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Combina o carregamento de produtores com a aplicação inicial de filtros
-  Future<void> _loadProducersAndApplyFilters() async {
+  Future<void> _updateProducersList() async {
+    if (!mounted) return;
     setState(() {
       _isLoadingProducers = true;
     });
+
     try {
-      final producers = await _firestoreService.getAgricultores().first;
-      if (!mounted) return;
+      // Passo 1: Obter TODOS os produtores da base de dados.
+      List<UserModel> allProducers = await _firestoreService.getAgricultores().first;
+      List<UserModel> filteredProducers = List.from(allProducers);
 
-      setState(() {
-        _producers = producers;
-      });
+      // Passo 2: Aplicar o filtro de categoria, se existir
+      if (_selectedCategory != null) {
+        final categoryProducers = await _firestoreService.getProducersByCategory(_selectedCategory!);
+        final categoryIds = categoryProducers.map((p) => p.uid).toSet();
+        filteredProducers = filteredProducers.where((p) => categoryIds.contains(p.uid)).toList();
+      }
+
+      // Passo 3: Aplicar o filtro de distância
+      if (_currentPosition != null) {
+        filteredProducers = filteredProducers.where((producer) {
+          if (producer.latitude == null || producer.longitude == null) {
+            return false;
+          }
+          final distanceInKm = _locationService.calculateDistance(
+            _currentPosition!.latitude,
+            _currentPosition!.longitude,
+            producer.latitude!,
+            producer.longitude!,
+          ) / 1000;
+          return distanceInKm <= _maxDistance;
+        }).toList();
+      }
       
-      // Após carregar todos, aplicamos os filtros (distância, etc.)
-      await _applyFilters();
+      // Passo 4: Gerar os marcadores para o mapa a partir dos dados filtrados
+      final newMarkers = _generateMarkers(filteredProducers);
+      if (_currentPosition != null) {
+        newMarkers.add(
+          Marker(
+            width: 80,
+            height: 80,
+            point: latlong.LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+            child: const Icon(Icons.my_location, color: Colors.blueAccent, size: 30),
+          )
+        );
+      }
 
+      // Passo 5: Atualizar o estado da UI com os dados finais
+      if (mounted) {
+        setState(() {
+          _producers = allProducers;
+          _filteredProducers = filteredProducers;
+          _markers = newMarkers;
+        });
+      }
     } catch (e) {
-      print('Erro fatal ao carregar produtores: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao carregar produtores: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
       if (mounted) {
         setState(() {
           _isLoadingProducers = false;
@@ -110,32 +163,45 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _initializeLocationAndMoveCamera() async {
+  Future<bool> _initializeLocationAndMoveCamera() async {
     Position? userPosition;
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
-      final userModel = await _firestoreService.getUser(currentUser.uid).first;
-      if (userModel.latitude != null && userModel.longitude != null) {
-        userPosition = Position(
-          latitude: userModel.latitude!,
-          longitude: userModel.longitude!,
-          timestamp: DateTime.now(),
-          accuracy: 0.0,
-          altitude: 0.0,
-          altitudeAccuracy: 0.0,
-          heading: 0.0,
-          headingAccuracy: 0.0,
-          speed: 0.0,
-          speedAccuracy: 0.0,
-        );
+      try {
+        final userModel = await _firestoreService.getUser(currentUser.uid).first;
+        if (userModel.latitude != null && userModel.longitude != null) {
+          userPosition = Position(
+            latitude: userModel.latitude!,
+            longitude: userModel.longitude!,
+            timestamp: DateTime.now(),
+            accuracy: 0.0,
+            altitude: 0.0,
+            altitudeAccuracy: 0.0,
+            heading: 0.0,
+            headingAccuracy: 0.0,
+            speed: 0.0,
+            speedAccuracy: 0.0,
+          );
+        }
+      } catch (e) {
+        // É normal não ter a localização na BD, não é um erro crítico.
+        debugPrint("Não foi possível obter a localização do perfil do utilizador: $e");
       }
     }
 
     if (userPosition == null) {
       try {
+        // Este é o ponto que pode "prender" a app se o utilizador não responder à permissão.
+        // Ao estar num `then`, não bloqueia o build inicial.
         userPosition = await _locationService.getCurrentLocation();
       } catch (e) {
-        print('Erro ao obter localização do dispositivo: $e');
+        debugPrint('Erro ao obter localização do dispositivo: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Não foi possível obter a sua localização. Verifique as permissões.'),
+            backgroundColor: Colors.orange,
+          ));
+        }
       }
     }
 
@@ -146,17 +212,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Mover a câmara do mapa para a nova posição
       if (userPosition != null) {
-        final controller = await _mapController.future;
-        controller.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: LatLng(userPosition.latitude, userPosition.longitude),
-              zoom: 12.0, // Zoom mais apropriado para uma localização específica
-            ),
-          ),
+        _mapController.move(
+          latlong.LatLng(userPosition.latitude, userPosition.longitude),
+          12.0, // Zoom mais apropriado para uma localização específica
         );
+        return true; // Indica que a localização foi obtida com sucesso.
       }
     }
+    return false; // Indica que a localização não foi obtida.
   }
 
   Future<void> _loadCategories() async {
@@ -178,75 +241,50 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _applyFilters() async {
-    setState(() {
-      _isLoadingProducers = true;
-    });
-
-    // 1. FAZER TODO O TRABALHO ASSÍNCRONO PRIMEIRO
-    List<UserModel> filtered = List.from(_producers);
-
-    if (_selectedCategory != null) {
-      final categoryProducers = await FirestoreService().getProducersByCategory(_selectedCategory!);
-      final categoryIds = categoryProducers.map((p) => p.uid).toSet();
-      filtered = filtered.where((p) => categoryIds.contains(p.uid)).toList();
-    }
-
-    if (_currentPosition != null) {
-      filtered = filtered.where((producer) {
-        if (producer.latitude == null || producer.longitude == null) {
-          return true; 
-        }
-        final distanceInKm = _locationService.calculateDistance(
-              _currentPosition!.latitude,
-              _currentPosition!.longitude,
-              producer.latitude!,
-              producer.longitude!,
-            ) / 1000;
-        return distanceInKm <= _maxDistance;
-      }).toList();
-    }
-    
-    // 2. GERAR OS MARCADORES A PARTIR DOS DADOS FINAIS
-    final newMarkers = _generateMarkers(filtered);
-
-    // 3. CHAMAR SETSTATE APENAS UMA VEZ COM OS DADOS FINAIS
-    if (mounted) {
-      setState(() {
-        _filteredProducers = filtered;
-        _markers = newMarkers;
-        _isLoadingProducers = false;
-      });
-    }
-  }
-
   void _clearFilters() {
     setState(() {
       _selectedCategory = null;
       _maxDistance = 50.0;
     });
     // Re-aplicar filtros para voltar ao estado inicial (considerando distância)
-    _applyFilters();
+    _updateProducersList();
   }
 
-  // Renomeado e modificado para não chamar setState
-  Set<Marker> _generateMarkers(List<UserModel> producers) {
-    return producers
+  List<Marker> _generateMarkers(List<UserModel> producers) {
+    final markers = producers
         .where((p) => p.latitude != null && p.longitude != null)
         .map((producer) => Marker(
-              markerId: MarkerId(producer.uid),
-              position: LatLng(producer.latitude!, producer.longitude!),
-              infoWindow: InfoWindow(
-                title: producer.nome,
-                snippet: 'Clique para ver detalhes',
+              width: 80.0,
+              height: 80.0,
+              point: latlong.LatLng(producer.latitude!, producer.longitude!),
+              child: GestureDetector(
                 onTap: () {
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (context) => ProducerDetailScreen(producerId: producer.uid),
-                  ));
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (context) => ProducerDetailScreen(producerId: producer.uid),
+                    ));
                 },
+                child: Column(
+                  children: [
+                    Icon(Icons.location_pin, color: Theme.of(context).primaryColor, size: 40),
+                    Text(producer.nome, style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, backgroundColor: Colors.white.withOpacity(0.7))),
+                  ],
+                )
               ),
             ))
-        .toSet();
+        .toList();
+
+    // Adiciona o marcador do utilizador se a localização for conhecida
+    if (_currentPosition != null) {
+      markers.add(
+        Marker(
+          width: 80,
+          height: 80,
+          point: latlong.LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+          child: const Icon(Icons.my_location, color: Colors.blueAccent, size: 30),
+        )
+      );
+    }
+    return markers;
   }
 
   Widget _buildFilterBar() {
@@ -327,7 +365,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             setState(() {
                               _selectedCategory = value;
                             });
-                            _applyFilters();
+                            _updateProducersList();
                           },
                         ),
                 ),
@@ -356,7 +394,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       });
                     },
                     onChangeEnd: (value) {
-                      _applyFilters();
+                      _updateProducersList();
                     },
                   ),
                 ),
@@ -376,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 ElevatedButton.icon(
-                  onPressed: _applyFilters,
+                  onPressed: _updateProducersList,
                   icon: const Icon(Icons.search),
                   label: const Text('Aplicar'),
                   style: ElevatedButton.styleFrom(
@@ -400,18 +438,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMapView() {
-    return GoogleMap(
-      mapType: MapType.normal,
-      initialCameraPosition: _defaultCameraPosition,
-      onMapCreated: (GoogleMapController controller) {
-        if (!_mapController.isCompleted) {
-          _mapController.complete(controller);
-        }
-      },
-      markers: _markers,
-      myLocationEnabled: true,
-      myLocationButtonEnabled: true,
-      padding: const EdgeInsets.only(bottom: 60), // Para não sobrepor o FAB
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: _currentPosition != null
+            ? latlong.LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
+            : _defaultLocation,
+        initialZoom: _currentPosition != null ? 12.0 : 7.0,
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.hellofarmer_app',
+        ),
+        MarkerLayer(markers: _markers),
+      ],
     );
   }
 

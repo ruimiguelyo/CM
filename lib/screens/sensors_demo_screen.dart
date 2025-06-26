@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hellofarmer_app/services/location_service.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
@@ -23,11 +24,11 @@ class _SensorsDemoScreenState extends State<SensorsDemoScreen> {
   bool _isLoadingLocation = false;
   String _locationError = '';
   
-  GoogleMapController? _mapController;
-  Set<Marker> _markers = {};
+  final MapController _mapController = MapController();
+  List<Marker> _markers = [];
   
   // Coordenadas padrão (centro de Portugal)
-  static const LatLng _defaultLocation = LatLng(39.5, -8.0);
+  static final latlong.LatLng _defaultLocation = latlong.LatLng(39.5, -8.0);
 
   @override
   void initState() {
@@ -110,39 +111,38 @@ class _SensorsDemoScreenState extends State<SensorsDemoScreen> {
   }
 
   void _moveMapCamera(Position position) {
-    if (_mapController != null) {
-      _mapController!.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          LatLng(position.latitude, position.longitude),
-          15.0,
-        ),
-      );
-    }
+    _mapController.move(
+      latlong.LatLng(position.latitude, position.longitude),
+      15.0,
+    );
   }
 
   void _updateMapMarker(Position position, {bool isProducer = false}) {
     if (!mounted) return;
     
     setState(() {
-      _markers = {
+      _markers = [
         Marker(
-          markerId: const MarkerId('current_location'),
-          position: LatLng(position.latitude, position.longitude),
-          infoWindow: InfoWindow(
-            title: isProducer ? 'A sua Quinta' : 'A sua Localização',
-            snippet: isProducer ? 'Localização guardada no seu perfil' : 'Localização atual do dispositivo',
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(isProducer ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueBlue),
+          width: 80.0,
+          height: 80.0,
+          point: latlong.LatLng(position.latitude, position.longitude),
+          child: Column(
+            children: [
+              Icon(Icons.location_pin, color: isProducer ? Colors.green : Colors.blue, size: 40),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                color: Colors.white.withOpacity(0.8),
+                child: Text(
+                  isProducer ? 'A sua Quinta' : 'A sua Localização',
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          )
         ),
-      };
+      ];
     });
-  }
-
-  void _onMapCreated(GoogleMapController controller) {
-    _mapController = controller;
-    if (_currentPosition != null) {
-      _moveMapCamera(_currentPosition!);
-    }
   }
 
   @override
@@ -246,58 +246,35 @@ class _SensorsDemoScreenState extends State<SensorsDemoScreen> {
 
   Widget _buildMapWidget() {
     try {
-      return GoogleMap(
-        onMapCreated: _onMapCreated,
-        initialCameraPosition: CameraPosition(
-          target: _currentPosition != null 
-              ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
+      return FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: _currentPosition != null
+              ? latlong.LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
               : _defaultLocation,
-          zoom: _currentPosition != null ? 15.0 : 6.0,
+          initialZoom: _currentPosition != null ? 14.0 : 7.0,
+          onMapReady: () {
+            if (_currentPosition != null) {
+              _moveMapCamera(_currentPosition!);
+            }
+          },
         ),
-        markers: _markers,
-        myLocationEnabled: true,
-        myLocationButtonEnabled: false, // Usamos nosso próprio botão
-        zoomControlsEnabled: true,
-        compassEnabled: true,
-        mapType: MapType.normal,
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.example.hellofarmer_app',
+          ),
+          MarkerLayer(markers: _markers),
+        ],
       );
     } catch (e) {
-      // Fallback se o Google Maps não estiver disponível
-      return Container(
-        color: Colors.grey.shade100,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.map_outlined, size: 80, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'Mapa indisponível',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            if (_currentPosition != null)
-              Text(
-                'Lat: ${_currentPosition!.latitude.toStringAsFixed(4)}\nLng: ${_currentPosition!.longitude.toStringAsFixed(4)}',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-              ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _initializeLocation,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Tentar Novamente'),
-            ),
-          ],
-        ),
-      );
+      // Fallback
+      return Center(child: Text('Erro ao carregar o mapa: $e'));
     }
   }
 
   @override
   void dispose() {
-    _mapController?.dispose();
     super.dispose();
   }
 } 

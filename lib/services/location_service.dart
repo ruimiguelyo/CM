@@ -1,26 +1,41 @@
+import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:google_maps_apis/places.dart';
-import 'package:uuid/uuid.dart';
+import 'package:http/http.dart' as http;
 
-// NOTA: Esta API Key precisa de ter a "Places API" ativa na Consola Google Cloud.
-// Foi retirada do ficheiro firebase_options.dart.
-const String _kGoogleApiKey = "AIzaSyDF2qdqOBav6_32TAHP3FSrLpvYPKuAbH8";
+/// Classe para modelar as sugestões de morada do Nominatim
+class AddressSuggestion {
+  final String placeId; // Usaremos o osm_id do Nominatim
+  final String description;
+  final double latitude;
+  final double longitude;
+
+  AddressSuggestion({
+    required this.placeId,
+    required this.description,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  factory AddressSuggestion.fromJson(Map<String, dynamic> json) {
+    return AddressSuggestion(
+      placeId: json['osm_id'].toString(),
+      description: json['display_name'],
+      latitude: double.parse(json['lat']),
+      longitude: double.parse(json['lon']),
+    );
+  }
+}
 
 class LocationService {
   static final LocationService _instance = LocationService._internal();
   factory LocationService() => _instance;
-  LocationService._internal() {
-    _places = GoogleMapsPlaces(apiKey: _kGoogleApiKey);
-  }
+  LocationService._internal();
 
   Position? _currentPosition;
   bool _isLocationEnabled = false;
-
-  // Instância do serviço do Google Places
-  late final GoogleMapsPlaces _places;
 
   Position? get currentPosition => _currentPosition;
   bool get isLocationEnabled => _isLocationEnabled;
@@ -163,54 +178,34 @@ class LocationService {
     }
   }
 
-  /// Gera um token de sessão para as pesquisas na Places API
-  String generateSessionToken() {
-    return const Uuid().v4();
-  }
-
-  /// Pesquisa moradas usando o autocompletar da Google Places API
-  Future<List<Prediction>> searchPlaces(String input, {required String sessionToken}) async {
-    if (input.isEmpty) {
+  /// Pesquisa moradas usando a API do Nominatim (OpenStreetMap)
+  Future<List<AddressSuggestion>> searchPlaces(String query) async {
+    if (query.length < 3) {
       return [];
     }
+
+    final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/search?q=$query&format=json&addressdetails=1&countrycodes=pt');
+
     try {
-      final response = await _places.autocomplete(
-        input,
-        sessionToken: sessionToken,
-        language: 'pt',
-        components: [Component(Component.country, "pt")], // Restringe a Portugal
+      final response = await http.get(
+        url,
+        headers: {
+          // O User-Agent é importante para a API do Nominatim
+          'User-Agent': 'HelloFarmerApp/1.0 (seu.email@exemplo.com)',
+        },
       );
 
-      if (response.status == "OK") {
-        return response.predictions ?? [];
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => AddressSuggestion.fromJson(json)).toList();
       } else {
-        debugPrint('Erro na API Places: ${response.errorMessage}');
+        debugPrint('Erro na API Nominatim: ${response.statusCode}');
         return [];
       }
     } catch (e) {
-      debugPrint('Erro ao pesquisar morada: $e');
+      debugPrint('Erro ao pesquisar morada via Nominatim: $e');
       return [];
-    }
-  }
-
-  /// Obtém os detalhes de uma morada a partir do seu placeId
-  Future<PlaceDetails?> getPlaceDetails(String placeId, {required String sessionToken}) async {
-    try {
-      final response = await _places.getDetailsByPlaceId(
-        placeId,
-        sessionToken: sessionToken,
-        language: 'pt',
-      );
-
-      if (response.status == "OK") {
-        return response.result;
-      } else {
-        debugPrint('Erro na API Place Details: ${response.errorMessage}');
-        return null;
-      }
-    } catch (e) {
-      debugPrint('Erro ao obter detalhes da morada: $e');
-      return null;
     }
   }
 } 

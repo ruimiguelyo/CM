@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_maps_apis/places.dart';
 import 'package:hellofarmer_app/models/order_model.dart';
 import 'package:hellofarmer_app/providers/cart_provider.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
@@ -30,8 +29,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   // Variáveis para a pesquisa de moradas
   Timer? _debounce;
-  List<Prediction> _predictions = [];
-  String? _sessionToken;
+  List<AddressSuggestion> _predictions = [];
   final FocusNode _moradaFocusNode = FocusNode();
 
   // Guardar as coordenadas de entrega
@@ -42,7 +40,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void initState() {
     super.initState();
     _loadUserData();
-    _sessionToken = _locationService.generateSessionToken();
     _moradaFocusNode.addListener(() {
       if (!_moradaFocusNode.hasFocus) {
         setState(() => _predictions = []);
@@ -82,7 +79,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _isSearching = true;
           _predictions = [];
         });
-        final result = await _locationService.searchPlaces(input, sessionToken: _sessionToken!);
+        final result = await _locationService.searchPlaces(input);
         if (mounted) {
           setState(() {
             _predictions = result;
@@ -95,36 +92,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
   }
 
-  Future<void> _onPredictionSelected(Prediction prediction) async {
+  void _onPredictionSelected(AddressSuggestion prediction) async {
     FocusScope.of(context).unfocus();
     setState(() {
-      _moradaController.text = prediction.description ?? '';
+      _moradaController.text = prediction.description;
+      _deliveryLatitude = prediction.latitude;
+      _deliveryLongitude = prediction.longitude;
       _predictions = [];
-      _isSearching = true;
+      _isSearching = false;
     });
 
-    final details = await _locationService.getPlaceDetails(prediction.placeId!, sessionToken: _sessionToken!);
-
-    if (details != null && mounted) {
-      String streetName = '', streetNumber = '', postalCode = '';
-      if (details.addressComponents != null) {
-        for (var component in details.addressComponents!) {
-          if (component.types?.contains('route') ?? false) streetName = component.longName ?? '';
-          if (component.types?.contains('street_number') ?? false) streetNumber = component.longName ?? '';
-          if (component.types?.contains('postal_code') ?? false) postalCode = component.longName ?? '';
-        }
+    final placemark = await _locationService.getAddressFromCoordinates(prediction.latitude, prediction.longitude);
+    if (placemark != null && placemark.postalCode != null) {
+      if (mounted) {
+        setState(() {
+          _codigoPostalController.text = placemark.postalCode!;
+        });
       }
-      setState(() {
-        _moradaController.text = '$streetName, $streetNumber'.trim().replaceAll(RegExp(r',$'), '');
-        _codigoPostalController.text = postalCode;
-        _deliveryLatitude = details.geometry?.location.lat;
-        _deliveryLongitude = details.geometry?.location.lng;
-        _isSearching = false;
-      });
-    } else if (mounted) {
-      setState(() => _isSearching = false);
     }
-    _sessionToken = _locationService.generateSessionToken();
   }
 
 
@@ -251,27 +236,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           validator: (value) => value!.isEmpty ? 'Insira a morada.' : null,
         ),
         if (_predictions.isNotEmpty)
-          Container(
+          SizedBox(
             height: 200,
-            margin: const EdgeInsets.only(top: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 5,
-                ),
-              ],
-            ),
             child: ListView.builder(
               itemCount: _predictions.length,
               itemBuilder: (context, index) {
                 final prediction = _predictions[index];
                 return ListTile(
-                  leading: const Icon(Icons.location_city_outlined),
-                  title: Text(prediction.description ?? ''),
+                  title: Text(prediction.description),
                   onTap: () => _onPredictionSelected(prediction),
                 );
               },
