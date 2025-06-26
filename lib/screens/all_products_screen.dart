@@ -116,16 +116,23 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                     child: Container(
                       color: Colors.grey.shade100,
                       child: product.imagemUrl.isNotEmpty
-                          ? Image.network(
-                              product.imagemUrl,
-                              fit: BoxFit.cover,
-                              loadingBuilder: (context, child, progress) {
-                                return progress == null ? child : const Center(child: CircularProgressIndicator());
-                              },
-                              errorBuilder: (context, error, stackTrace) {
-                                return Icon(Icons.agriculture_outlined, size: 40, color: Colors.grey.shade400);
-                              },
-                            )
+                          ? (product.imagemUrl.startsWith('assets/')
+                              ? Image.asset(
+                                  product.imagemUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Icon(Icons.broken_image, size: 40, color: Colors.grey.shade400),
+                                )
+                              : Image.network(
+                                  product.imagemUrl,
+                                  fit: BoxFit.cover,
+                                  loadingBuilder: (context, child, progress) {
+                                    return progress == null ? child : const Center(child: CircularProgressIndicator());
+                                  },
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Icon(Icons.agriculture_outlined, size: 40, color: Colors.grey.shade400);
+                                  },
+                                ))
                           : Icon(Icons.agriculture_outlined, size: 40, color: Colors.grey.shade400),
                     ),
                   ),

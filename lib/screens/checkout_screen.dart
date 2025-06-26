@@ -2,13 +2,12 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:hellofarmer_app/models/order_model.dart';
 import 'package:hellofarmer_app/providers/cart_provider.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
 import 'package:hellofarmer_app/services/location_service.dart';
 import 'package:provider/provider.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:hellofarmer_app/screens/order_success_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -24,7 +23,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _codigoPostalController = TextEditingController();
   final _firestoreService = FirestoreService();
   final _locationService = LocationService();
-  final _audioPlayer = AudioPlayer();
 
   // Estado do UI
   bool _isLoading = false;
@@ -60,7 +58,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _codigoPostalController.dispose();
     _debounce?.cancel();
     _moradaFocusNode.dispose();
-    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -168,9 +165,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
       
       cart.clear();
-      
-      // Toca o som de sucesso
-      _audioPlayer.play(AssetSource('sounds/purchase.mp3'));
 
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => const OrderSuccessScreen()),

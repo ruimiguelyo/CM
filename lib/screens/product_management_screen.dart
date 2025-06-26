@@ -104,7 +104,19 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
               child: Container(
                 color: Colors.grey.shade100,
                 child: produto.imagemUrl.isNotEmpty
-                    ? Image.network(produto.imagemUrl, fit: BoxFit.cover)
+                    ? (produto.imagemUrl.startsWith('assets/')
+                        ? Image.asset(
+                            produto.imagemUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.agriculture_outlined, size: 40, color: Colors.grey),
+                          )
+                        : Image.network(
+                            produto.imagemUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.agriculture_outlined, size: 40, color: Colors.grey),
+                          ))
                     : const Icon(Icons.agriculture_outlined, size: 40, color: Colors.grey),
               ),
             ),

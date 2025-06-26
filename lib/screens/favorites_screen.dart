@@ -70,11 +70,9 @@ class FavoritesScreen extends StatelessWidget {
         }
         
         return StreamBuilder<List<ProductModel>>(
-          stream: firestoreService.getProductsByIds(favoriteIds),
+          stream: firestoreService.getAllProducts(),
           builder: (context, productSnapshot) {
-            final products = productSnapshot.data ?? [];
-
-            if (productSnapshot.connectionState == ConnectionState.waiting && products.isEmpty) {
+            if (productSnapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
 
@@ -98,6 +96,9 @@ class FavoritesScreen extends StatelessWidget {
                 ),
               );
             }
+
+            final allProducts = productSnapshot.data ?? [];
+            final products = allProducts.where((product) => favoriteIds.contains(product.id)).toList();
 
             if (products.isEmpty) {
               return Center(
@@ -154,19 +155,20 @@ class FavoritesScreen extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  product.imagemUrl,
+                child: SizedBox(
                   width: 80,
                   height: 80,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: 80,
-                      height: 80,
-                      color: Colors.grey.shade200,
-                      child: const Icon(Icons.broken_image, color: Colors.grey),
-                    );
-                  },
+                  child: product.imagemUrl.startsWith('assets/')
+                      ? Image.asset(
+                          product.imagemUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => _buildErrorIcon(),
+                        )
+                      : Image.network(
+                          product.imagemUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => _buildErrorIcon(),
+                        ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -241,6 +243,15 @@ class FavoritesScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildErrorIcon() {
+    return Container(
+      width: 80,
+      height: 80,
+      color: Colors.grey.shade200,
+      child: const Icon(Icons.broken_image, color: Colors.grey),
     );
   }
 } 

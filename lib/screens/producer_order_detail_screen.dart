@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:hellofarmer_app/models/order_model.dart';
 import 'package:hellofarmer_app/models/user_model.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart' as latlong;
 
 class ProducerOrderDetailScreen extends StatefulWidget {
   final OrderModel order;
@@ -157,30 +155,30 @@ class _ProducerOrderDetailScreenState extends State<ProducerOrderDetailScreen> {
       aspectRatio: 16 / 9,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: FlutterMap(
-          options: MapOptions(
-            initialCenter: latlong.LatLng(lat, lon),
-            initialZoom: 15.0,
-            interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.hellofarmer_app',
-            ),
-            MarkerLayer(markers: [
-              Marker(
-                width: 80.0,
-                height: 80.0,
-                point: latlong.LatLng(lat, lon),
-                child: Icon(
+        child: Container(
+          color: Colors.grey.shade200,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
                   isCustomer ? Icons.location_on : Icons.store, 
                   color: isCustomer ? Colors.red : Theme.of(context).primaryColor, 
                   size: 40
                 ),
-              )
-            ]),
-          ],
+                const SizedBox(height: 8),
+                Text(
+                  isCustomer ? 'Localização do Cliente' : 'Localização do Produtor',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Lat: ${lat.toStringAsFixed(4)}, Lon: ${lon.toStringAsFixed(4)}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

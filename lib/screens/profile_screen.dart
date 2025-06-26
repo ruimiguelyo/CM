@@ -17,10 +17,19 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final FirestoreService _firestoreService = FirestoreService();
-  final String _uid = FirebaseAuth.instance.currentUser!.uid;
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('O Meu Perfil'),
@@ -40,7 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       body: StreamBuilder<UserModel>(
-        stream: _firestoreService.getUser(_uid),
+        stream: _firestoreService.getUser(user.uid),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -52,18 +61,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             return const Center(child: Text('Utilizador não encontrado.'));
           }
 
-          final user = snapshot.data!;
+          final userModel = snapshot.data!;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.symmetric(vertical: 24.0),
             child: Column(
               children: [
-                _buildProfileHeader(context, user),
+                _buildProfileHeader(context, userModel),
                 const SizedBox(height: 32),
-                _buildInfoCard(context, user),
+                _buildInfoCard(context, userModel),
                 const SizedBox(height: 16),
-                if (user.tipo == 'agricultor')
-                  _buildProducerActions(context, user)
+                if (userModel.tipo == 'agricultor')
+                  _buildProducerActions(context, userModel)
                 else
                   _buildConsumerActions(context),
                 const SizedBox(height: 24),

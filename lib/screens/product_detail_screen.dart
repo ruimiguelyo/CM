@@ -57,11 +57,17 @@ class ProductDetailScreen extends StatelessWidget {
         background: Hero(
           tag: 'product_image_${product.id}',
           child: product.imagemUrl.isNotEmpty
-              ? Image.network(
-                  product.imagemUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.agriculture_outlined, size: 80, color: Colors.grey),
-                )
+              ? (product.imagemUrl.startsWith('assets/')
+                  ? Image.asset(
+                      product.imagemUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.agriculture_outlined, size: 80, color: Colors.grey),
+                    )
+                  : Image.network(
+                      product.imagemUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.agriculture_outlined, size: 80, color: Colors.grey),
+                    ))
               : Container(
                   color: Colors.grey.shade200,
                   child: const Icon(Icons.agriculture_outlined, size: 80, color: Colors.grey),

@@ -30,7 +30,7 @@ class CartItemModel {
   factory CartItemModel.fromMap(Map<String, dynamic> map) {
     return CartItemModel(
       product: ProductModel.fromMap(map['product']),
-      quantity: map['quantity'],
+      quantity: map['quantity'] ?? 1,
     );
   }
 } 

@@ -178,12 +178,17 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
 
   List<Widget> _buildProductAvatars(List<dynamic> items) {
     return List.generate(items.length > 3 ? 3 : items.length, (index) {
+      final item = items[index];
+      final imageUrl = item.product.imagemUrl;
+      final isLocal = imageUrl.startsWith('assets/');
+
       return Align(
         widthFactor: 0.7,
         child: CircleAvatar(
           radius: 15,
-          backgroundImage: NetworkImage(items[index].product.imagemUrl),
           backgroundColor: Colors.grey.shade200,
+          backgroundImage: isLocal ? AssetImage(imageUrl) as ImageProvider : NetworkImage(imageUrl),
+          child: isLocal && imageUrl.isEmpty ? const Icon(Icons.broken_image, size: 15) : null,
         ),
       );
     });

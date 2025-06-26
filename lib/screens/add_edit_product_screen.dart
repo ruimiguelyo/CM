@@ -229,8 +229,11 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
       );
     }
     if (_imagemUrlExistente != null && _imagemUrlExistente!.isNotEmpty) {
+      final imageProvider = _imagemUrlExistente!.startsWith('assets/')
+          ? AssetImage(_imagemUrlExistente!)
+          : NetworkImage(_imagemUrlExistente!) as ImageProvider;
       return DecorationImage(
-        image: NetworkImage(_imagemUrlExistente!),
+        image: imageProvider,
         fit: BoxFit.cover,
       );
     }

@@ -247,228 +247,44 @@ class FirestoreService {
     });
   }
 
-  // Obtém uma lista de produtos com base numa lista de IDs.
-  Stream<List<ProductModel>> getProductsByIds(List<String> productIds) {
-    final validIds = productIds.where((id) => id.isNotEmpty).toList();
-
-    if (validIds.isEmpty) {
-      return Stream.value([]);
-    }
-
-    // Firestore `whereIn` supports a maximum of 30 elements.
-    // We will truncate the list if it's longer, which is a temporary limitation
-    // for the sake of making this function work correctly.
-    final idsToQuery = validIds.length > 30 ? validIds.sublist(0, 30) : validIds;
-
-    return _db
-        .collectionGroup('products')
-        .where(FieldPath.documentId, whereIn: idsToQuery)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => ProductModel.fromFirestore(doc))
-          .toList();
-    }).handleError((error) {
-      print("Error fetching products by IDs: $error");
-      return <ProductModel>[];
-    });
-  }
-
-  // Obtém uma lista de utilizadores com base numa lista de IDs.
-  Stream<List<UserModel>> getUsersByIds(List<String> userIds) {
-    if (userIds.isEmpty) {
-      return Stream.value([]);
-    }
-
-    // Filtra IDs válidos (não nulos e não vazios)
-    final validIds = userIds.where((id) => id.isNotEmpty).toList();
-    if (validIds.isEmpty) {
-      return Stream.value([]);
-    }
-
-    try {
-      // O Firestore tem um limite de 30 elementos para queries com 'in'.
-      // Dividimos a lista em pedaços de 10 para ser mais seguro.
-      final List<Stream<List<UserModel>>> streams = [];
-      for (var i = 0; i < validIds.length; i += 10) {
-        final sublist = validIds.sublist(i, i + 10 > validIds.length ? validIds.length : i + 10);
-        streams.add(_db
-            .collection('users')
-            .where(FieldPath.documentId, whereIn: sublist)
-            .snapshots()
-            .map((snapshot) => snapshot.docs
-                .map((doc) => UserModel.fromFirestore(doc))
-                .toList())
-            .handleError((error) {
-              print('Erro ao obter utilizadores por IDs: $error');
-              return <UserModel>[];
-            }));
-      }
-      
-      // Combinar os resultados de todas as streams
-      return streams.length == 1 ? streams.first : _combineStreams(streams);
-    } catch (e) {
-      print('Erro na query getUsersByIds: $e');
-      return Stream.value([]);
-    }
-  }
-
-  // Helper para combinar múltiplas streams
-  Stream<List<T>> _combineStreams<T>(List<Stream<List<T>>> streams) {
-    return Stream.multi((controller) {
-      final List<List<T>> results = List.filled(streams.length, []);
-      int streamsDone = 0;
-
-      for (int i = 0; i < streams.length; i++) {
-        streams[i].listen((data) {
-          results[i] = data;
-          if (streamsDone == streams.length) {
-            controller.add(results.expand((x) => x).toList());
-          }
-        }, onDone: () {
-          streamsDone++;
-          if (streamsDone == streams.length) {
-            controller.add(results.expand((x) => x).toList());
-            controller.close();
-          }
-        });
-      }
-    });
-  }
-
-  // Buscar produtores que vendem produtos de uma categoria específica
-  Future<List<UserModel>> getProducersByCategory(String categoria) async {
-    try {
-      // Primeiro, buscar produtos da categoria especificada
-      final QuerySnapshot productSnapshot = await FirebaseFirestore.instance
-          .collectionGroup('products')
-          .where('categoria', isEqualTo: categoria)
-          .get();
-
-      // Extrair IDs únicos de produtores
-      final Set<String> producerIds = productSnapshot.docs
-          .map((doc) => doc['produtorId'] as String)
-          .toSet();
-
-      if (producerIds.isEmpty) {
-        return [];
-      }
-
-      // Buscar produtores pelos IDs
-      final List<UserModel> producers = [];
-      
-      // Firestore tem limite de 30 IDs por consulta 'in' (era 10, mas foi aumentado)
-      final List<List<String>> chunks = [];
-      final List<String> idList = producerIds.toList();
-      
-      for (int i = 0; i < idList.length; i += 30) {
-        chunks.add(idList.sublist(
-          i, 
-          i + 30 > idList.length ? idList.length : i + 30
-        ));
-      }
-
-      for (final chunk in chunks) {
-        if (chunk.isEmpty) continue;
-        final QuerySnapshot userSnapshot = await FirebaseFirestore.instance
-            .collection('users')
-            .where(FieldPath.documentId, whereIn: chunk)
-            .get();
-
-        producers.addAll(
-          userSnapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList()
-        );
-      }
-
-      return producers;
-    } catch (e) {
-      print('Erro ao buscar produtores por categoria: $e');
-      return [];
-    }
-  }
-
-  // Buscar produtores dentro de uma distância específica
-  Future<List<UserModel>> getProducersWithinDistance(
-    double userLat, 
-    double userLon, 
-    double maxDistanceKm
-  ) async {
-    try {
-      // Buscar todos os produtores com coordenadas válidas
-      final QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('tipo', isEqualTo: 'agricultor')
-          .where('latitude', isNotEqualTo: null)
-          .where('longitude', isNotEqualTo: null)
-          .get();
-
-      final List<UserModel> producers = [];
-
-      for (final doc in snapshot.docs) {
-        final UserModel producer = UserModel.fromFirestore(doc);
-        
-        if (producer.latitude != null && producer.longitude != null) {
-          final double distance = _calculateDistance(
-            userLat, userLon,
-            producer.latitude!, producer.longitude!
-          );
-
-          if (distance <= maxDistanceKm) {
-            producers.add(producer);
-          }
-        }
-      }
-
-      return producers;
-    } catch (e) {
-      print('Erro ao buscar produtores por distância: $e');
-      return [];
-    }
-  }
-
-  // Calcular distância entre duas coordenadas usando a fórmula de Haversine
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    const double earthRadius = 6371; // Raio da Terra em km
-
-    final double dLat = _degreesToRadians(lat2 - lat1);
-    final double dLon = _degreesToRadians(lon2 - lon1);
-
-    final double a = 
-        sin(dLat / 2) * sin(dLat / 2) +
-        cos(_degreesToRadians(lat1)) * cos(_degreesToRadians(lat2)) *
-        sin(dLon / 2) * sin(dLon / 2);
-
-    final double c = 2 * asin(sqrt(a));
-    
-    return earthRadius * c;
-  }
-
-  double _degreesToRadians(double degrees) {
-    return degrees * (pi / 180);
-  }
-
-  // Buscar todas as categorias de produtos disponíveis
+  // NOVO: Obtém todas as categorias de produtos disponíveis.
   Future<List<String>> getAvailableCategories() async {
-    try {
-      final QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collectionGroup('products')
-          .get();
+    final snapshot = await _db.collectionGroup('products').get();
+    final categories = snapshot.docs
+        .map((doc) => doc.data()['categoria'] as String?)
+        .where((c) => c != null && c.isNotEmpty)
+        .cast<String>()
+        .toSet()
+        .toList();
+    categories.sort();
+    return categories;
+  }
 
-      final Set<String> categories = {};
-      
-      for (final doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        final categoria = data['categoria'] as String?;
-        if (categoria != null && categoria.isNotEmpty) {
-          categories.add(categoria);
-        }
-      }
+  // NOVO: Obtém todos os produtores que têm produtos numa dada categoria.
+  Future<List<UserModel>> getProducersByCategory(String category) async {
+    // 1. Encontra todos os produtos na categoria
+    final productsSnapshot = await _db
+        .collectionGroup('products')
+        .where('categoria', isEqualTo: category)
+        .get();
+    
+    // 2. Extrai os IDs únicos dos produtores
+    final producerIds = productsSnapshot.docs
+        .map((doc) => doc.data()['produtorId'] as String)
+        .toSet();
 
-      final List<String> sortedCategories = categories.toList()..sort();
-      return sortedCategories;
-    } catch (e) {
-      print('Erro ao buscar categorias: $e');
+    if (producerIds.isEmpty) {
       return [];
     }
+
+    // 3. Busca os dados desses produtores
+    final usersSnapshot = await _db
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: producerIds.toList())
+        .get();
+        
+    return usersSnapshot.docs
+        .map((doc) => UserModel.fromFirestore(doc))
+        .toList();
   }
 } 

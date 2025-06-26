@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 import 'package:hellofarmer_app/screens/consumer_hub.dart';
 
 class OrderSuccessScreen extends StatelessWidget {
@@ -14,11 +13,18 @@ class OrderSuccessScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Lottie.asset(
-                'assets/animations/order_success.json',
-                width: 250,
-                height: 250,
-                repeat: false,
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: Colors.green.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check_circle,
+                  size: 80,
+                  color: Colors.green.shade600,
+                ),
               ),
               const SizedBox(height: 24),
               Text(

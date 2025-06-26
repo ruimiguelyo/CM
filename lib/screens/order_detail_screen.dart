@@ -198,8 +198,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             itemBuilder: (context, index) {
               final item = widget.order.items[index];
               return ListTile(
-                leading: Image.network(item.product.imagemUrl, width: 50, height: 50, fit: BoxFit.cover, 
-                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
+                leading: SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: item.product.imagemUrl.startsWith('assets/')
+                        ? Image.asset(
+                            item.product.imagemUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
+                          )
+                        : Image.network(
+                            item.product.imagemUrl,
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
+                          ),
+                  ),
                 ),
                 title: Text(item.product.nome),
                 subtitle: Text('Quantidade: ${item.quantity}'),

@@ -203,12 +203,17 @@ class _HomeScreenState extends State<HomeScreen> {
         _currentPosition = userPosition;
       });
 
-      // Mover a câmara do mapa para a nova posição
-      if (userPosition != null) {
-        _mapController.move(
-          latlong.LatLng(userPosition.latitude, userPosition.longitude),
-          12.0, // Zoom mais apropriado para uma localização específica
-        );
+      // Mover a câmara do mapa para a nova posição - APENAS se estivermos na vista do mapa
+      if (userPosition != null && _isMapView) {
+        try {
+          _mapController.move(
+            latlong.LatLng(userPosition.latitude, userPosition.longitude),
+            12.0, // Zoom mais apropriado para uma localização específica
+          );
+        } catch (e) {
+          // Ignora erros do MapController se o widget não estiver renderizado
+          debugPrint('MapController não está pronto ainda: $e');
+        }
         return true; // Indica que a localização foi obtida com sucesso.
       }
     }

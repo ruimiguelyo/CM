@@ -319,15 +319,23 @@ class _ProducerDetailScreenState extends State<ProducerDetailScreen> {
               // Imagem do Produto
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: product.imagemUrl.isNotEmpty
-                    ? Image.network(
-                        product.imagemUrl,
-                        width: 70,
-                        height: 70,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _buildPlaceholderImage(),
-                      )
-                    : _buildPlaceholderImage(),
+                child: SizedBox(
+                  width: 70,
+                  height: 70,
+                  child: product.imagemUrl.isNotEmpty
+                      ? (product.imagemUrl.startsWith('assets/')
+                          ? Image.asset(
+                              product.imagemUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _buildPlaceholderImage(),
+                            )
+                          : Image.network(
+                              product.imagemUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _buildPlaceholderImage(),
+                            ))
+                      : _buildPlaceholderImage(),
+                ),
               ),
               const SizedBox(width: 16),
               // Informação do Produto

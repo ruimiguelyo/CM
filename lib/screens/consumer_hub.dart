@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:hellofarmer_app/providers/cart_provider.dart';
 import 'package:hellofarmer_app/screens/cart_screen.dart';
 import 'package:hellofarmer_app/screens/favorites_hub_screen.dart';
+import 'package:hellofarmer_app/screens/auth_gate.dart';
 
 class ConsumerHub extends StatefulWidget {
   const ConsumerHub({super.key});
@@ -83,7 +84,31 @@ class _ConsumerHubState extends State<ConsumerHub> {
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sair',
-            onPressed: () => FirebaseAuth.instance.signOut(),
+            onPressed: () async {
+              // Adiciona um loading visual para dar feedback imediato
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('A terminar sessão...')),
+              );
+              try {
+                await FirebaseAuth.instance.signOut();
+                // Após o logout, remove todos os ecrãs e volta para o AuthGate
+                if (mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const AuthGate()), 
+                    (route) => false
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erro ao sair: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
           ),
         ],
       ),

@@ -27,7 +27,19 @@ class ProducerReviewsScreen extends StatelessWidget {
             ),
           );
         }
-        final reviews = snapshot.data!;
+        final reviews = snapshot.data!.where((order) {
+          return order.status == 'Entregue' && order.producerRating != null;
+        }).toList();
+
+        if (reviews.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('Ainda não recebeu nenhuma avaliação.', style: TextStyle(fontSize: 16)),
+            ),
+          );
+        }
+
         return ListView.builder(
           itemCount: reviews.length,
           itemBuilder: (context, index) {
