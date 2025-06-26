@@ -22,124 +22,115 @@ class FavoritesScreen extends StatelessWidget {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Favoritos'),
-      ),
-      body: StreamBuilder<UserModel>(
-        stream: firestoreService.getUser(user.uid),
-        builder: (context, userSnapshot) {
-          if (userSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          
-          if (userSnapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  Text('Erro ao carregar favoritos: ${userSnapshot.error}'),
-                ],
-              ),
-            );
-          }
-
-          if (!userSnapshot.hasData) {
-            return const Center(child: Text('Dados do utilizador não encontrados.'));
-          }
-
-          final favoriteIds = userSnapshot.data!.favoritos;
-
-          if (favoriteIds.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.favorite_border, size: 64, color: Colors.grey.shade400),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Ainda não tem produtos favoritos.',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Explore produtos e adicione aos seus favoritos!',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-            );
-          }
-          
-          return StreamBuilder<List<ProductModel>>(
-            stream: firestoreService.getProductsByIds(favoriteIds),
-            builder: (context, productSnapshot) {
-              if (productSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (productSnapshot.hasError) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      Text('Erro ao carregar produtos: ${productSnapshot.error}'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          // Força um rebuild do widget
-                          (context as Element).markNeedsBuild();
-                        },
-                        child: const Text('Tentar Novamente'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              if (!productSnapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final favoriteProducts = productSnapshot.data!;
-
-              if (favoriteProducts.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.shade400),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Produtos favoritos não encontrados.',
-                        style: TextStyle(fontSize: 18),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Alguns produtos podem ter sido removidos.',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: favoriteProducts.length,
-                itemBuilder: (context, index) {
-                  final product = favoriteProducts[index];
-                  return _buildFavoriteItem(context, product);
-                },
-              );
-            },
+    return StreamBuilder<UserModel>(
+      stream: firestoreService.getUser(user.uid),
+      builder: (context, userSnapshot) {
+        if (userSnapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (userSnapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text('Erro ao carregar favoritos: ${userSnapshot.error}'),
+              ],
+            ),
           );
-        },
-      ),
+        }
+
+        if (!userSnapshot.hasData) {
+          return const Center(child: Text('Dados do utilizador não encontrados.'));
+        }
+
+        final favoriteIds = userSnapshot.data!.favoritos;
+
+        if (favoriteIds.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.favorite_border, size: 64, color: Colors.grey.shade400),
+                const SizedBox(height: 16),
+                const Text(
+                  'Ainda não tem produtos favoritos.',
+                  style: TextStyle(fontSize: 18),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Explore produtos e adicione aos seus favoritos!',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ],
+            ),
+          );
+        }
+        
+        return StreamBuilder<List<ProductModel>>(
+          stream: firestoreService.getProductsByIds(favoriteIds),
+          builder: (context, productSnapshot) {
+            final products = productSnapshot.data ?? [];
+
+            if (productSnapshot.connectionState == ConnectionState.waiting && products.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (productSnapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    Text('Erro ao carregar produtos: ${productSnapshot.error}'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        // Força um rebuild do widget
+                        (context as Element).markNeedsBuild();
+                      },
+                      child: const Text('Tentar Novamente'),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            if (products.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.favorite_border, size: 64, color: Colors.grey.shade400),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Ainda não tem produtos favoritos.',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Explore produtos e adicione aos seus favoritos!',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: products.length,
+              itemBuilder: (context, index) {
+                final product = products[index];
+                return _buildFavoriteItem(context, product);
+              },
+            );
+          },
+        );
+      },
     );
   }
 
@@ -232,15 +223,18 @@ class FavoritesScreen extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.favorite, color: Colors.red),
-                onPressed: () {
-                  firestoreService.removerProdutoDosFavoritos(userId, product.id!);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${product.nome} removido dos favoritos!'),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
+                icon: const Icon(Icons.favorite, color: Colors.redAccent),
+                onPressed: () async {
+                  await firestoreService.removerProdutoDosFavoritos(userId, product.id!);
+                  // Não é necessário setState, o StreamBuilder do user irá reconstruir
+                  if(context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${product.nome} removido dos favoritos!'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
                 },
               ),
             ],

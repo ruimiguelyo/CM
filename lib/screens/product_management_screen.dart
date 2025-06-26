@@ -17,29 +17,23 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gestão de Produtos'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        foregroundColor: Theme.of(context).colorScheme.onSurface,
-        elevation: 0,
-      ),
-      body: StreamBuilder<List<ProductModel>>(
-        stream: _firestoreService.getProdutos(widget.userId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Ocorreu um erro: ${snapshot.error}'));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return _buildEmptyState(context);
-          }
+    return StreamBuilder<List<ProductModel>>(
+      stream: _firestoreService.getProdutos(widget.userId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Ocorreu um erro: ${snapshot.error}'));
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildEmptyState(context);
+        }
 
-          final produtos = snapshot.data!;
+        final produtos = snapshot.data!;
 
-          return GridView.builder(
+        return Scaffold(
+          body: GridView.builder(
             padding: const EdgeInsets.all(16),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
@@ -55,16 +49,16 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                   .fade(delay: (100 * index).ms, duration: 400.ms)
                   .scale(begin: const Offset(0.9, 0.9));
             },
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (context) => AddEditProductScreen(userId: widget.userId)),
-        ),
-        label: const Text('Adicionar'),
-        icon: const Icon(Icons.add),
-      ),
+          ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => AddEditProductScreen(userId: widget.userId)),
+            ),
+            label: const Text('Adicionar'),
+            icon: const Icon(Icons.add),
+          ),
+        );
+      },
     );
   }
 

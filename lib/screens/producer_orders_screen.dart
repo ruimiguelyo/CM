@@ -36,49 +36,49 @@ class _ProducerOrdersScreenState extends State<ProducerOrdersScreen> with Single
       return const Scaffold(body: Center(child: Text("Utilizador não encontrado.")));
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Encomendas Recebidas'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        foregroundColor: Theme.of(context).colorScheme.onSurface,
-        elevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Theme.of(context).primaryColor,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Theme.of(context).primaryColor,
-          tabs: const [
-            Tab(text: 'NOVAS'),
-            Tab(text: 'CONCLUÍDAS'),
-          ],
-        ),
-      ),
-      body: StreamBuilder<List<OrderModel>>(
-        stream: FirestoreService().getProducerOrders(user.uid),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Ocorreu um erro: ${snapshot.error}'));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return _buildEmptyOrders(context);
-          }
+    return StreamBuilder<List<OrderModel>>(
+      stream: FirestoreService().getProducerOrders(user.uid),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Ocorreu um erro: ${snapshot.error}'));
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildEmptyOrders(context);
+        }
 
-          final orders = snapshot.data!;
-          final newOrders = orders.where((o) => o.status != 'Entregue').toList();
-          final completedOrders = orders.where((o) => o.status == 'Entregue').toList();
+        final orders = snapshot.data!;
+        final newOrders = orders.where((o) => o.status != 'Entregue').toList();
+        final completedOrders = orders.where((o) => o.status == 'Entregue').toList();
 
-          return TabBarView(
-            controller: _tabController,
+        return Material(
+          child: Column(
             children: [
-              _buildOrderList(context, newOrders, 'Nenhuma encomenda nova.'),
-              _buildOrderList(context, completedOrders, 'Nenhuma encomenda concluída.'),
+              TabBar(
+                controller: _tabController,
+                labelColor: Theme.of(context).primaryColor,
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: Theme.of(context).primaryColor,
+                tabs: const [
+                  Tab(text: 'NOVAS'),
+                  Tab(text: 'CONCLUÍDAS'),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildOrderList(context, newOrders, 'Nenhuma encomenda nova.'),
+                    _buildOrderList(context, completedOrders, 'Nenhuma encomenda concluída.'),
+                  ],
+                ),
+              ),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 

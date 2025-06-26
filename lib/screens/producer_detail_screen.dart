@@ -10,6 +10,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:hellofarmer_app/screens/product_detail_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProducerDetailScreen extends StatefulWidget {
   final String producerId;
@@ -55,6 +56,7 @@ class _ProducerDetailScreenState extends State<ProducerDetailScreen> {
       appBar: AppBar(
         title: const Text('Perfil do Produtor'),
         actions: [
+          _buildFavoriteProducerButton(context, firestoreService),
           IconButton(
             icon: const Icon(Icons.qr_code),
             onPressed: () => _showQRCode(context),
@@ -119,6 +121,40 @@ class _ProducerDetailScreenState extends State<ProducerDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildFavoriteProducerButton(BuildContext context, FirestoreService firestoreService) {
+    final authUser = FirebaseAuth.instance.currentUser;
+    // Se não houver utilizador logado, não mostra o botão.
+    if (authUser == null) return const SizedBox.shrink();
+
+    return StreamBuilder<UserModel>(
+      stream: firestoreService.getUser(authUser.uid),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+
+        final user = snapshot.data!;
+        // Um produtor não se pode favoritar a si mesmo.
+        if (user.tipo == 'agricultor') return const SizedBox.shrink();
+
+        final isFavorite = user.favoriteProducers.contains(widget.producerId);
+
+        return IconButton(
+          tooltip: isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos',
+          icon: Icon(
+            isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+            color: isFavorite ? Colors.redAccent : null,
+          ),
+          onPressed: () {
+            if (isFavorite) {
+              firestoreService.removerProdutorDosFavoritos(user.uid, widget.producerId);
+            } else {
+              firestoreService.addProdutorAosFavoritos(user.uid, widget.producerId);
+            }
+          },
+        );
+      },
     );
   }
 

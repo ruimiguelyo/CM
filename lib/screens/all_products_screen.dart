@@ -23,75 +23,70 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
   Widget build(BuildContext context) {
     final authUser = FirebaseAuth.instance.currentUser;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Todos os Produtos'),
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-              decoration: InputDecoration(
-                labelText: 'Pesquisar produtos...',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextField(
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+              });
+            },
+            decoration: InputDecoration(
+              labelText: 'Pesquisar produtos...',
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
               ),
             ),
           ),
-          Expanded(
-            child: StreamBuilder<List<ProductModel>>(
-              stream: _firestoreService.getAllProducts(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Erro: ${snapshot.error}'));
-                }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(
-                    child: Text('Ainda não há produtos disponíveis.'),
+        ),
+        Expanded(
+          child: StreamBuilder<List<ProductModel>>(
+            stream: _firestoreService.getAllProducts(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text('Erro: ${snapshot.error}'));
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Center(
+                  child: Text('Ainda não há produtos disponíveis.'),
+                );
+              }
+
+              var products = snapshot.data!;
+              if (_searchQuery.isNotEmpty) {
+                products = products.where((product) {
+                  return product.nome.toLowerCase().contains(_searchQuery.toLowerCase());
+                }).toList();
+              }
+
+              return GridView.builder(
+                padding: const EdgeInsets.all(10.0),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.7,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  final product = products[index];
+                  return _buildProductCard(context, product, authUser);
+                },
+              ).animate().slideY(
+                    duration: 500.ms,
+                    begin: 0.1,
+                    curve: Curves.easeOut,
                   );
-                }
-
-                var products = snapshot.data!;
-                if (_searchQuery.isNotEmpty) {
-                  products = products.where((product) {
-                    return product.nome.toLowerCase().contains(_searchQuery.toLowerCase());
-                  }).toList();
-                }
-
-                return GridView.builder(
-                  padding: const EdgeInsets.all(10.0),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.7,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: products.length,
-                  itemBuilder: (context, index) {
-                    final product = products[index];
-                    return _buildProductCard(context, product, authUser);
-                  },
-                ).animate().slideY(
-                      duration: 500.ms,
-                      begin: 0.1,
-                      curve: Curves.easeOut,
-                    );
-              },
-            ),
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -110,60 +105,70 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
           borderRadius: BorderRadius.circular(12),
         ),
         elevation: 0,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Stack(
           children: [
-            Expanded(
-              child: Hero(
-                tag: 'product_image_${product.id}',
-                child: Container(
-                  color: Colors.grey.shade100,
-                  child: product.imagemUrl.isNotEmpty
-                      ? Image.network(
-                          product.imagemUrl,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, progress) {
-                            return progress == null ? child : const Center(child: CircularProgressIndicator());
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Icon(Icons.agriculture_outlined, size: 40, color: Colors.grey.shade400);
-                          },
-                        )
-                      : Icon(Icons.agriculture_outlined, size: 40, color: Colors.grey.shade400),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: Hero(
+                    tag: 'product_image_${product.id}',
+                    child: Container(
+                      color: Colors.grey.shade100,
+                      child: product.imagemUrl.isNotEmpty
+                          ? Image.network(
+                              product.imagemUrl,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (context, child, progress) {
+                                return progress == null ? child : const Center(child: CircularProgressIndicator());
+                              },
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(Icons.agriculture_outlined, size: 40, color: Colors.grey.shade400);
+                              },
+                            )
+                          : Icon(Icons.agriculture_outlined, size: 40, color: Colors.grey.shade400),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.nome,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '€${product.preco.toStringAsFixed(2)} / ${product.unidade}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildStockIndicator(context, product),
-                      _buildAddToCartButton(context, product, authUser),
+                      Text(
+                        product.nome,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '€${product.preco.toStringAsFixed(2)} / ${product.unidade}',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildStockIndicator(context, product),
+                          _buildAddToCartButton(context, product, authUser),
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+            if (authUser != null)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: _buildFavoriteButton(context, product.id ?? '', authUser.uid),
+              ),
           ],
         ),
       ),
@@ -229,6 +234,58 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
           );
         }
         return const SizedBox.shrink();
+      },
+    );
+  }
+
+  Widget _buildFavoriteButton(BuildContext context, String productId, String userId) {
+    return StreamBuilder<UserModel>(
+      stream: _firestoreService.getUser(userId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Icon(Icons.favorite_border, color: Colors.grey);
+        }
+
+        final user = snapshot.data!;
+        final isFavorite = user.favoritos.contains(productId);
+
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () async {
+              try {
+                if (isFavorite) {
+                  await _firestoreService.removerProdutoDosFavoritos(userId, productId);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Removido dos favoritos!'), backgroundColor: Colors.orange),
+                  );
+                } else {
+                  await _firestoreService.addProdutoAosFavoritos(userId, productId);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Adicionado aos favoritos!'), backgroundColor: Colors.green),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Erro ao atualizar favoritos: $e')),
+                );
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: isFavorite ? Colors.redAccent : Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
+        );
       },
     );
   }

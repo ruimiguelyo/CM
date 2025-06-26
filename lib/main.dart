@@ -14,9 +14,11 @@ import 'package:flutter/foundation.dart';
 // para poder ser chamada quando a app está em segundo plano.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Se quiser fazer algo com a mensagem em segundo plano, como guardar dados,
-  // pode fazer aqui. Por agora, apenas imprimimos para depuração.
-  print("A lidar com uma mensagem em segundo plano: ${message.messageId}");
+  // If you're going to use other Firebase services in the background, like Firestore,
+  // make sure you call `initializeApp` before using them.
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  print("Handling a background message: ${message.messageId}");
 }
 
 Future<void> main() async {
@@ -26,21 +28,28 @@ Future<void> main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   } on FirebaseException catch (e) {
+    // This is a workaround for a known issue with Firebase initialization on hot reloads.
     if (e.code != 'duplicate-app') {
       rethrow;
     }
   }
 
+  // Handle background messages for notifications
+  // This needs to be outside of the app's main logic
   if (!kIsWeb) {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-    await NotificationService().initNotifications();
   }
 
-  runApp(const HelloFarmerApp());
+  // Inicializa o serviço de notificações aqui.
+  await NotificationService().initNotifications();
+
+  runApp(const MyApp());
 }
 
-class HelloFarmerApp extends StatelessWidget {
-  const HelloFarmerApp({super.key});
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +59,7 @@ class HelloFarmerApp extends StatelessWidget {
         title: 'HelloFarmer',
         theme: AppTheme.lightTheme,
         // Usamos o SplashScreen como ecrã inicial
+        navigatorKey: navigatorKey,
         home: const SplashScreen(),
         debugShowCheckedModeBanner: false,
       ),

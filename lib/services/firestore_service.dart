@@ -159,6 +159,11 @@ class FirestoreService {
             .toList());
   }
 
+  // NOVO: Obtém um documento de encomenda específico pelo seu ID
+  Future<DocumentSnapshot> getOrderById(String orderId) {
+    return _db.collection('orders').doc(orderId).get();
+  }
+
   // NOVO: Atualiza o estado de uma encomenda
   Future<void> updateOrderStatus(String orderId, String newStatus) {
     return _db.collection('orders').doc(orderId).update({'status': newStatus});
@@ -228,14 +233,55 @@ class FirestoreService {
     });
   }
 
+  // --- MÉTODOS PARA GESTÃO DE PRODUTORES FAVORITOS ---
+
+  Future<void> addProdutorAosFavoritos(String userId, String producerId) {
+    return _db.collection('users').doc(userId).update({
+      'favoriteProducers': FieldValue.arrayUnion([producerId])
+    });
+  }
+
+  Future<void> removerProdutorDosFavoritos(String userId, String producerId) {
+    return _db.collection('users').doc(userId).update({
+      'favoriteProducers': FieldValue.arrayRemove([producerId])
+    });
+  }
+
   // Obtém uma lista de produtos com base numa lista de IDs.
   Stream<List<ProductModel>> getProductsByIds(List<String> productIds) {
-    if (productIds.isEmpty) {
+    final validIds = productIds.where((id) => id.isNotEmpty).toList();
+
+    if (validIds.isEmpty) {
+      return Stream.value([]);
+    }
+
+    // Firestore `whereIn` supports a maximum of 30 elements.
+    // We will truncate the list if it's longer, which is a temporary limitation
+    // for the sake of making this function work correctly.
+    final idsToQuery = validIds.length > 30 ? validIds.sublist(0, 30) : validIds;
+
+    return _db
+        .collectionGroup('products')
+        .where(FieldPath.documentId, whereIn: idsToQuery)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => ProductModel.fromFirestore(doc))
+          .toList();
+    }).handleError((error) {
+      print("Error fetching products by IDs: $error");
+      return <ProductModel>[];
+    });
+  }
+
+  // Obtém uma lista de utilizadores com base numa lista de IDs.
+  Stream<List<UserModel>> getUsersByIds(List<String> userIds) {
+    if (userIds.isEmpty) {
       return Stream.value([]);
     }
 
     // Filtra IDs válidos (não nulos e não vazios)
-    final validIds = productIds.where((id) => id.isNotEmpty).toList();
+    final validIds = userIds.where((id) => id.isNotEmpty).toList();
     if (validIds.isEmpty) {
       return Stream.value([]);
     }
@@ -243,26 +289,26 @@ class FirestoreService {
     try {
       // O Firestore tem um limite de 30 elementos para queries com 'in'.
       // Dividimos a lista em pedaços de 10 para ser mais seguro.
-      final List<Stream<List<ProductModel>>> streams = [];
+      final List<Stream<List<UserModel>>> streams = [];
       for (var i = 0; i < validIds.length; i += 10) {
         final sublist = validIds.sublist(i, i + 10 > validIds.length ? validIds.length : i + 10);
         streams.add(_db
-            .collectionGroup('products')
+            .collection('users')
             .where(FieldPath.documentId, whereIn: sublist)
             .snapshots()
             .map((snapshot) => snapshot.docs
-                .map((doc) => ProductModel.fromFirestore(doc))
+                .map((doc) => UserModel.fromFirestore(doc))
                 .toList())
             .handleError((error) {
-              print('Erro ao obter produtos por IDs: $error');
-              return <ProductModel>[];
+              print('Erro ao obter utilizadores por IDs: $error');
+              return <UserModel>[];
             }));
       }
       
       // Combinar os resultados de todas as streams
       return streams.length == 1 ? streams.first : _combineStreams(streams);
     } catch (e) {
-      print('Erro na query getProductsByIds: $e');
+      print('Erro na query getUsersByIds: $e');
       return Stream.value([]);
     }
   }

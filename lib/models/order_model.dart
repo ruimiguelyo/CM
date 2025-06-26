@@ -8,7 +8,7 @@ class OrderModel {
   final double total;
   final Timestamp orderDate;
   final String status;
-  final Map<String, String> shippingAddress;
+  final Map<String, dynamic> shippingAddress;
   final List<String> producerIds;
   final double? orderRating;
   final double? producerRating;
@@ -74,7 +74,7 @@ class OrderModel {
       total: (data['total'] as num).toDouble(),
       orderDate: data['orderDate'],
       status: data['status'],
-      shippingAddress: Map<String, String>.from(data['shippingAddress'] ?? {}),
+      shippingAddress: Map<String, dynamic>.from(data['shippingAddress'] ?? {}),
       producerIds: List<String>.from(data['producerIds'] ?? []),
       orderRating: (data['orderRating'] as num?)?.toDouble(),
       producerRating: (data['producerRating'] as num?)?.toDouble(),

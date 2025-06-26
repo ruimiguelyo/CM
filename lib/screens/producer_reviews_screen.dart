@@ -13,32 +13,29 @@ class ProducerReviewsScreen extends StatelessWidget {
     final firestoreService = FirestoreService();
     final producerId = FirebaseAuth.instance.currentUser!.uid;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Minhas Avaliações')),
-      body: StreamBuilder<List<OrderModel>>(
-        stream: firestoreService.getProducerReviews(producerId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text('Ainda não recebeu nenhuma avaliação.', style: TextStyle(fontSize: 16)),
-              ),
-            );
-          }
-          final reviews = snapshot.data!;
-          return ListView.builder(
-            itemCount: reviews.length,
-            itemBuilder: (context, index) {
-              final review = reviews[index];
-              return _buildReviewCard(context, review, firestoreService);
-            },
+    return StreamBuilder<List<OrderModel>>(
+      stream: firestoreService.getProducerReviews(producerId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('Ainda não recebeu nenhuma avaliação.', style: TextStyle(fontSize: 16)),
+            ),
           );
-        },
-      ),
+        }
+        final reviews = snapshot.data!;
+        return ListView.builder(
+          itemCount: reviews.length,
+          itemBuilder: (context, index) {
+            final review = reviews[index];
+            return _buildReviewCard(context, review, firestoreService);
+          },
+        );
+      },
     );
   }
 

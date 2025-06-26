@@ -8,6 +8,8 @@ import 'package:hellofarmer_app/providers/cart_provider.dart';
 import 'package:hellofarmer_app/services/firestore_service.dart';
 import 'package:hellofarmer_app/services/location_service.dart';
 import 'package:provider/provider.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:hellofarmer_app/screens/order_success_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -22,6 +24,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _codigoPostalController = TextEditingController();
   final _firestoreService = FirestoreService();
   final _locationService = LocationService();
+  final _audioPlayer = AudioPlayer();
 
   // Estado do UI
   bool _isLoading = false;
@@ -31,6 +34,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Timer? _debounce;
   List<AddressSuggestion> _predictions = [];
   final FocusNode _moradaFocusNode = FocusNode();
+
+  // NOVO: Estado para controlar o modo de entrega
+  bool _isDelivery = true; 
+  double _shippingCost = 5.0; // Custo de entrega padrão
 
   // Guardar as coordenadas de entrega
   double? _deliveryLatitude;
@@ -53,6 +60,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _codigoPostalController.dispose();
     _debounce?.cancel();
     _moradaFocusNode.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -127,10 +135,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
     
-    final shippingAddress = {
-      'morada': _moradaController.text,
-      'codigoPostal': _codigoPostalController.text,
-    };
+    final Map<String, dynamic> shippingAddress;
+    if (_isDelivery) {
+      shippingAddress = {
+        'morada': _moradaController.text,
+        'codigoPostal': _codigoPostalController.text,
+        'latitude': _deliveryLatitude,
+        'longitude': _deliveryLongitude,
+      };
+    } else {
+      // Se for levantamento, guarda uma morada especial e coordenadas nulas
+      shippingAddress = {
+        'morada': 'Levantamento no produtor',
+        'codigoPostal': '',
+        'latitude': null,
+        'longitude': null,
+      };
+    }
 
     final producerIds = cart.items.values.map((item) => item.product.produtorId).toSet().toList();
 
@@ -139,19 +160,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         OrderModel(
           userId: user.uid,
           items: cart.items.values.toList(),
-          total: cart.totalAmount,
+          total: cart.totalAmount + (_isDelivery ? _shippingCost : 0),
           orderDate: Timestamp.now(),
           shippingAddress: shippingAddress,
           producerIds: producerIds,
-          deliveryLatitude: _deliveryLatitude,
-          deliveryLongitude: _deliveryLongitude,
         ),
       );
       
       cart.clear();
-      Navigator.of(context).popUntil((route) => route.isFirst);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Encomenda realizada com sucesso!'), backgroundColor: Colors.green),
+      
+      // Toca o som de sucesso
+      _audioPlayer.play(AssetSource('sounds/purchase.mp3'));
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const OrderSuccessScreen()),
+        (route) => false,
       );
 
     } catch (e) {
@@ -182,15 +205,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              _buildSectionHeader(context, '1', 'Endereço de Entrega'),
+              _buildSectionHeader(context, '1', 'Método de Entrega'),
               const SizedBox(height: 16),
-              _buildAddressSearch(),
+              _buildDeliveryToggle(),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _codigoPostalController,
-                decoration: const InputDecoration(labelText: 'Código Postal', prefixIcon: Icon(Icons.local_post_office_outlined)),
-                validator: (value) => value!.isEmpty ? 'Insira o código postal.' : null,
-              ),
+              
+              // O formulário de morada só aparece se for entrega
+              if (_isDelivery) ...[
+                _buildAddressSearch(),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _codigoPostalController,
+                  decoration: const InputDecoration(labelText: 'Código Postal', prefixIcon: Icon(Icons.local_post_office_outlined)),
+                  validator: (value) {
+                    if (_isDelivery && (value == null || value.isEmpty)) {
+                      return 'Insira o código postal.';
+                    }
+                    return null;
+                  }
+                ),
+              ] else ...[
+                _buildPickupInfo(),
+              ],
+
               const SizedBox(height: 32),
               _buildSectionHeader(context, '2', 'Resumo do Pedido'),
               const SizedBox(height: 16),
@@ -221,6 +258,45 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  Widget _buildDeliveryToggle() {
+    return SwitchListTile(
+      title: const Text('Entrega ao Domicílio'),
+      subtitle: Text(_isDelivery ? 'A sua encomenda será entregue na sua morada.' : 'Irá levantar a sua encomenda na banca do produtor.'),
+      value: _isDelivery,
+      onChanged: (bool value) {
+        setState(() {
+          _isDelivery = value;
+          // Limpar previsões se o utilizador alternar
+          if (_predictions.isNotEmpty) _predictions = [];
+        });
+      },
+      secondary: Icon(_isDelivery ? Icons.local_shipping_outlined : Icons.store_mall_directory_outlined),
+    );
+  }
+
+  Widget _buildPickupInfo() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: Colors.blue.shade700),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'A morada para levantamento será combinada após a confirmação da encomenda.',
+              style: TextStyle(fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAddressSearch() {
     return Column(
       children: [
@@ -233,7 +309,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             prefixIcon: const Icon(Icons.location_on_outlined),
             suffixIcon: _isSearching ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : null,
           ),
-          validator: (value) => value!.isEmpty ? 'Insira a morada.' : null,
+          validator: (value) {
+            if (_isDelivery && (value == null || value.isEmpty)) {
+              return 'Insira a morada.';
+            }
+            return null;
+          }
         ),
         if (_predictions.isNotEmpty)
           SizedBox(
@@ -257,38 +338,49 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        side: BorderSide(color: Colors.grey.shade200, width: 1),
         borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          ...cart.items.values.map((item) {
-            return ListTile(
-              leading: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: Image.network(item.product.imagemUrl, width: 40, height: 40, fit: BoxFit.cover),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            ...cart.items.values.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: Text('${item.product.nome} (x${item.quantity})')),
+                  Text('€${(item.product.preco * item.quantity).toStringAsFixed(2)}'),
+                ],
               ),
-              title: Text(item.product.nome),
-              subtitle: Text('x${item.quantity}'),
-              trailing: Text('€${(item.product.preco * item.quantity).toStringAsFixed(2)}'),
-            );
-          }),
-          const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
+            )),
+            const Divider(height: 24),
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Total', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                Text(
-                  '€${cart.totalAmount.toStringAsFixed(2)}',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                ),
+                const Text('Subtotal'),
+                Text('€${cart.totalAmount.toStringAsFixed(2)}'),
               ],
             ),
-          )
-        ],
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Custo de Entrega'),
+                Text(_isDelivery ? '€${_shippingCost.toStringAsFixed(2)}' : '€0.00'),
+              ],
+            ),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Total', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                Text('€${(cart.totalAmount + (_isDelivery ? _shippingCost : 0)).toStringAsFixed(2)}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              ],
+            )
+          ],
+        ),
       ),
     );
   }
@@ -311,31 +403,39 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildBottomBar(BuildContext context, CartProvider cart) {
     return Container(
-      padding: const EdgeInsets.all(16).copyWith(bottom: 16 + MediaQuery.of(context).padding.bottom),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
+          color: Theme.of(context).colorScheme.surface,
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5)),
+          ]
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('TOTAL', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              Text(
+                '€${(cart.totalAmount + (_isDelivery ? _shippingCost : 0)).toStringAsFixed(2)}',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          ElevatedButton.icon(
+            onPressed: _isLoading ? null : () => _placeOrder(cart),
+            icon: _isLoading
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Icon(Icons.lock_outline),
+            label: Text(_isLoading ? 'A PROCESSAR...' : 'PAGAR E FINALIZAR'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+            ),
           ),
         ],
-        border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
-      ),
-      child: ElevatedButton.icon(
-        icon: _isLoading ? const SizedBox.shrink() : const Icon(Icons.check_circle_outline_rounded),
-        label: _isLoading
-            ? const SizedBox(
-                height: 24,
-                width: 24,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-              )
-            : const Text('Confirmar Encomenda'),
-        onPressed: _isLoading ? null : () => _placeOrder(cart),
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-        ),
       ),
     );
   }

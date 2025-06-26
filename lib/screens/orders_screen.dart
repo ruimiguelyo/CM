@@ -32,26 +32,25 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Minhas Encomendas'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        foregroundColor: Theme.of(context).colorScheme.onSurface,
-        elevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Theme.of(context).primaryColor,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Theme.of(context).primaryColor,
-          tabs: const [
-            Tab(text: 'ATIVAS'),
-            Tab(text: 'ENTREGUES'),
-          ],
-        ),
-      ),
-      body: user == null
-          ? _buildLoginPrompt(context)
-          : StreamBuilder<List<OrderModel>>(
+    if (user == null) {
+      return _buildLoginPrompt(context);
+    }
+
+    return Material(
+      child: Column(
+        children: [
+          TabBar(
+            controller: _tabController,
+            labelColor: Theme.of(context).primaryColor,
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: Theme.of(context).primaryColor,
+            tabs: const [
+              Tab(text: 'ATIVAS'),
+              Tab(text: 'ENTREGUES'),
+            ],
+          ),
+          Expanded(
+            child: StreamBuilder<List<OrderModel>>(
               stream: FirestoreService().getUserOrders(user.uid),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -77,6 +76,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                 );
               },
             ),
+          ),
+        ],
+      ),
     );
   }
 

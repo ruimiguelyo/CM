@@ -21,7 +21,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter/widgets.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final bool isMapView;
+  const HomeScreen({super.key, this.isMapView = false});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -56,6 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _isMapView = widget.isMapView; // Define o estado inicial da vista
     _loadInitialData();
   }
 
@@ -127,18 +129,9 @@ class _HomeScreenState extends State<HomeScreen> {
         }).toList();
       }
       
-      // Passo 4: Gerar os marcadores para o mapa a partir dos dados filtrados
+      // Passo 4: Gerar os marcadores para o mapa a partir dos dados filtrados.
+      // A função _generateMarkers já cuida de adicionar o pino do utilizador.
       final newMarkers = _generateMarkers(filteredProducers);
-      if (_currentPosition != null) {
-        newMarkers.add(
-          Marker(
-            width: 80,
-            height: 80,
-            point: latlong.LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-            child: const Icon(Icons.my_location, color: Colors.blueAccent, size: 30),
-          )
-        );
-      }
 
       // Passo 5: Atualizar o estado da UI com os dados finais
       if (mounted) {
@@ -491,95 +484,15 @@ class _HomeScreenState extends State<HomeScreen> {
     // A lógica para determinar a UI é feita aqui, uma vez por build.
     final bool isConsumer = _currentUserModel!.tipo == 'consumidor';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('HelloFarmer'),
-        actions: [
-          // Ícone para GPS (removido temporariamente se não for usado)
-          // IconButton(
-          //   icon: const Icon(Icons.map),
-          //   onPressed: () {
-          //     Navigator.of(context).push(MaterialPageRoute(
-          //       builder: (context) => const SensorsDemoScreen(),
-          //     ));
-          //   },
-          //   tooltip: 'GPS e Localização',
-          // ),
-          // Apenas mostra o ícone do carrinho se for um consumidor
-          if (isConsumer)
-            Consumer<CartProvider>(
-              builder: (context, cart, child) => CustomBadge(
-                value: cart.itemCount.toString(),
-                child: IconButton(
-                  icon: const Icon(Icons.shopping_cart),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => const CartScreen()),
-                    );
-                  },
-                ),
-              ),
-            ),
-          if (isConsumer)
-            IconButton(
-              icon: const Icon(Icons.favorite_border),
-              onPressed: () {
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (context) => const FavoritesScreen(),
-                ));
-              },
-            ),
-          // Toggle entre vista de lista e mapa para consumidores
-          if (isConsumer)
-            IconButton(
-              icon: Icon(_isMapView ? Icons.list : Icons.map_outlined),
-              tooltip: _isMapView ? 'Ver Lista' : 'Ver Mapa',
-              onPressed: () {
-                setState(() {
-                  _isMapView = !_isMapView;
-                });
-              },
-            ),
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () {
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => const ProfileScreen(),
-              ));
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              FirebaseAuth.instance.signOut();
-            },
-          ),
-        ],
-        automaticallyImplyLeading: false,
-      ),
-      // O corpo da UI depende se é consumidor ou produtor
-      body: isConsumer
-          ? Column(
-              children: [
-                _buildFilterBar(),
-                Expanded(child: _buildBodyContent()),
-              ],
-            )
-          : _buildProducerDashboard(), // Dashboard para o produtor
-      
-      // Apenas mostra o botão flutuante se for consumidor E NÃO estiver no mapa
-      floatingActionButton: isConsumer && !_isMapView
-          ? FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const AllProductsScreen()),
-                );
-              },
-              label: const Text('Ver Produtos'),
-              icon: const Icon(Icons.shopping_basket_outlined),
-            )
-          : null,
-    );
+    // O corpo da UI depende se é consumidor ou produtor
+    return isConsumer
+        ? Column(
+            children: [
+              _buildFilterBar(),
+              Expanded(child: _buildBodyContent()),
+            ],
+          )
+        : _buildProducerDashboard(); // Dashboard para o produtor
   }
 
   // NOVO: Widget para o dashboard do produtor
